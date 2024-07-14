@@ -1,6 +1,6 @@
 {
-	"id": "obsidian-auto-correct",
-	"name": "Auto Correct Plugin",
+	"id": "auto-correct-capitals",
+	"name": "Auto Correct Capitals Misspellings",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically correct words with the first two letters in uppercase.",
