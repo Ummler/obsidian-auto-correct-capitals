@@ -1,6 +1,6 @@
 {
 	"id": "auto-correct-capitals",
-	"name": "Auto Correct Capitals",
+	"name": "Auto Correct Capitals Misspellings",
 	"version": "1.0.4",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically correct words with the first two letters in uppercase.",
