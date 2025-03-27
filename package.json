@@ -1,7 +1,7 @@
 {
 	"name": "Auto Correct Capitals Misspellings",
-	"version": "1.0.4",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"version": "1.0.7",
+	"description": "Corrects misspelled first letters in words.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
