@@ -1,34 +1,36 @@
-
 # Obsidian AutoCorrect Plugin
 
-This plugin automatically fixes common capitalization errors in your Obsidian notes. It specifically targets words where the first two letters are mistakenly capitalized (e.g., `HAllo` instead of `Hallo`) and corrects them. In addition, a new feature ensures that for list items, the first letter of the first word is always capitalized.
+This plugin automatically fixes common capitalization errors in your Obsidian notes. It specifically targets words where the first two letters are mistakenly capitalized (e.g., `HAllo` instead of `Hallo`) and corrects them. Additionally, new features ensure that list items are formatted correctly and that both codeblocks and math expressions (LaTeX) are protected from auto-correction.
 
 ## Features
 
 - **Automatic Correction**  
-  The plugin detects words where the first two letters are uppercase and the third letter is lowercase, and it automatically corrects them (e.g., `HAllo` → `Hallo`).
+  The plugin detects words where the first two letters are uppercase and the third letter is lowercase, automatically correcting them (e.g., `HAllo` → `Hallo`).
 
 - **Exclusion List**  
-  You can specify a list of words (separated by commas) that should be excluded from any corrections.
+  You can specify a list of words (comma separated) that should be excluded from any corrections.
 
 - **Optimize List Items**  
-  When the "Capitalize First Letter in List" option is enabled, any line that begins with `- ` will have the first letter of the following word capitalized.  
+  When the "Capitalize First Letter in List" option is enabled, any line starting with `- ` will have the first letter of the following word automatically capitalized.  
   **Example:**  
   - Before:  
     ```
     - hallo
-    ```
+    ```  
   - After:  
     ```
     - Hallo
-    ```
-  In addition, if the word is incorrectly capitalized (e.g., `- HAllo`), the plugin will also correct the second letter to lowercase.
+    ```  
+  Additionally, if a list item is incorrectly capitalized (e.g., `- HAllo`), the plugin will correct it to `- Hallo`.
 
 - **Codeblock Protection**  
-  No changes are made within codeblocks (either fenced or inline).
+  The plugin detects fenced codeblocks and inline code (using backticks) and skips any corrections within these areas.
+
+- **Mathblock Protection**  
+  The plugin now also detects LaTeX math expressions – both inline (delimited by `$...$`) and block math (delimited by `$$...$$`) – and leaves them unchanged. This prevents auto-correction of mathematical notations.
 
 - **Trigger on Various Characters**  
-  Corrections are triggered by specific punctuation characters or by pressing Enter. When Enter is pressed, the plugin checks the previous line for correction even in lists or quotes.
+  Corrections are triggered by specific punctuation characters (e.g., space, period, comma, etc.) or by pressing Enter. When Enter is pressed, the plugin checks the previous line for corrections (even in lists or quotes).
 
 ## Installation
 
@@ -46,54 +48,18 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
 
 ## Configuration
 
-The plugin provides two main settings:
+The plugin provides three main settings:
 
 - **Exclusion List**  
-  Add words (separated by commas) here that should not be corrected.
+  Enter words (comma separated) that should be excluded from any auto-correction.
 
 - **Capitalize First Letter in List**  
-  Enable this option to ensure that, in list items (lines starting with `- `), the first letter of the first word is automatically capitalized.  
+  When enabled, any list item (lines starting with `- `) will have the first letter of the following word automatically capitalized.  
   **Example:**  
   - Before: `- hallo`  
   - After: `- Hallo`  
-  Also, if a word like `- HAllo` is detected, the plugin corrects it to `- Hallo`.
+  Also, if a word such as `- HAllo` is detected, it will be corrected to `- Hallo`.
 
-## Usage
+- **Capitalize Sentence Beginnings**  
+  When enabled, the first letter of the last sentence in a line will be automatically capitalized if it was typed in lowercase.
 
-### Standard Auto-Correction
-
-- **Example:**  
-  Type `HAllo` in a regular line and then enter a trigger character (such as a space or punctuation) or press Enter.  
-  **Result:** `Hallo`
-
-### List Items
-
-- **Example 1 (Lowercase Start):**  
-  **Before:**  
-  ```
-  - hallo
-  ```  
-  **After:**  
-  ```
-  - Hallo
-  ```
-
-- **Example 2 (Incorrect Capitalization):**  
-  **Before:**  
-  ```
-  - HAllo
-  ```  
-  **After:**  
-  ```
-  - Hallo
-  ```
-
-### Codeblocks
-
-Words within codeblocks (fenced or inline using backticks) are not altered.
-
-````
-```
-HAllo // remains unchanged
-```
-````

@@ -1,6 +1,6 @@
 {
 	"name": "Auto Correct Capitals Misspellings",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"description": "Corrects misspelled first letters in words.",
 	"main": "main.js",
 	"scripts": {
