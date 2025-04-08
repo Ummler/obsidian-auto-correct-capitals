@@ -11,7 +11,7 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
   You can specify a list of words (comma separated) that should be excluded from any corrections.
 
 - **Optimize List Items**  
-  When the "Capitalize First Letter in List" option is enabled, any line starting with `- ` will have the first letter of the following word automatically capitalized.  
+  When the "Capitalize First Letter in List" option is enabled, any line starting with `- ` or `1. ` will have the first letter of the following word automatically capitalized.  
   **Example:**  
   - Before:  
     ```
@@ -27,7 +27,10 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
   The plugin detects fenced codeblocks and inline code (using backticks) and skips any corrections within these areas.
 
 - **Mathblock Protection**  
-  The plugin now also detects LaTeX math expressions – both inline (delimited by `$...$`) and block math (delimited by `$$...$$`) – and leaves them unchanged. This prevents auto-correction of mathematical notations.
+  The plugin detects LaTeX math expressions – both inline (delimited by `$...$`) and block math (delimited by `$$...$$`) – and leaves them unchanged. This prevents auto-correction of mathematical notations.
+
+- **YAML Front-matter Protection**
+  The plugin also detects the YAML Frontmatter and wont correct inside it. 
 
 - **Trigger on Various Characters**  
   Corrections are triggered by specific punctuation characters (e.g., space, period, comma, etc.) or by pressing Enter. When Enter is pressed, the plugin checks the previous line for corrections (even in lists or quotes).
@@ -54,12 +57,12 @@ The plugin provides three main settings:
   Enter words (comma separated) that should be excluded from any auto-correction.
 
 - **Capitalize First Letter in List**  
-  When enabled, any list item (lines starting with `- `) will have the first letter of the following word automatically capitalized.  
+  When enabled, any list item (lines starting with `- `or 'x. ' where x is a number) will have the first letter of the following word capitalized.  
   **Example:**  
   - Before: `- hallo`  
   - After: `- Hallo`  
   Also, if a word such as `- HAllo` is detected, it will be corrected to `- Hallo`.
 
 - **Capitalize Sentence Beginnings**  
-  When enabled, the first letter of the last sentence in a line will be automatically capitalized if it was typed in lowercase.
+  When enabled, the first letter of the last sentence in a line will be capitalized if it was typed in lowercase.
 
