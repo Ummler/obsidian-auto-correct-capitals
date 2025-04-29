@@ -10,6 +10,9 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
 - **Exclusion List**  
   You can specify a list of words (comma separated) that should be excluded from any corrections.
 
+- **Abbreviation List**
+  This allows you to define common abbreviations (like `e.g.`, `i.e.`, or `etc.`) that the plugin recognizes. When these abbreviations are used, they prevent the plugin from mistakenly capitalizing words immediately following them, ensuring correct capitalization after abbreviations in your sentences.
+
 - **Optimize List Items**  
   When the "Capitalize First Letter in List" option is enabled, any line starting with `- ` or `1. ` will have the first letter of the following word automatically capitalized.  
   **Example:**  
