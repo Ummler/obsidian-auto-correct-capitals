@@ -6,7 +6,7 @@ import { Plugin, PluginSettingTab, Setting, Editor } from 'obsidian';
 
 const TRIGGER_CHARS: string[] = [' ', '.', ',', ';', ':', '!', '?', '{', '"', ')', ']', '%', '}'];
 const LAST_WORD_REGEX: RegExp = /[\p{L}\p{M}']+(?=\W*$)/u;
-const LIST_ITEM_REGEX: RegExp = /^- (\S+)/;
+const LIST_ITEM_REGEX: RegExp = /^[-*] (\S+)/;
 const NUMBERED_LIST_REGEX: RegExp = /^(\d+)\.\s+(\S+)/;
 
 // ────────────────────────────────────────────────────────────────────────────────
