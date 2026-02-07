@@ -6,7 +6,7 @@ import { Plugin, PluginSettingTab, Setting, Editor } from 'obsidian';
 
 const TRIGGER_CHARS: string[] = [' ', '.', ',', ';', ':', '!', '?', '{', '"', ')', ']', '%', '}'];
 const LAST_WORD_REGEX: RegExp = /[\p{L}\p{M}']+(?=\W*$)/u;
-const LIST_ITEM_REGEX: RegExp = /^[\t ]*[-*]\s+(\S+)/;
+const LIST_ITEM_REGEX: RegExp = /^[\t ]*[-*+]\s+(\S+)/;
 const NUMBERED_LIST_REGEX: RegExp = /^(\d+)\.\s+(\S+)/;
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -92,6 +92,14 @@ export default class AutoCorrectPlugin extends Plugin {
     );
   }
 
+  private isExcludedWord(word: string): boolean {
+    const normalizedWord = word.toLowerCase();
+    if (this.exclusionSet.has(normalizedWord)) return true;
+
+    const strippedPunctuation = normalizedWord.replace(/^[^\p{L}\p{M}']+|[^\p{L}\p{M}']+$/gu, '');
+    return strippedPunctuation.length > 0 && this.exclusionSet.has(strippedPunctuation);
+  }
+
   // ──────────────────────────────────────────────────────────────────────
   // Main event handler
   // ──────────────────────────────────────────────────────────────────────
@@ -127,8 +135,8 @@ export default class AutoCorrectPlugin extends Plugin {
 		  // Tabs/Spaces am Anfang für die Erkennung ignorieren
 		  const trimmedIndent = fullLine.replace(/^[\t ]+/, '');
 
-		  // Auf Bullet-Listen mit '-' oder '*' prüfen
-		  if (/^[-*]\s+/.test(trimmedIndent)) {
+		  // Auf Bullet-Listen mit '-', '*' oder '+' prüfen
+		  if (/^[-*+]\s+/.test(trimmedIndent)) {
 			  this.correctListItem(editor, fullLine, lineNo);
 
 			  // Nummerierte Listen mit beliebiger Einrückung
@@ -162,7 +170,7 @@ export default class AutoCorrectPlugin extends Plugin {
     const wordStart = line.indexOf(word);
 
     if (!/^[\p{L}\p{M}]/u.test(word[0])) return;               // non‑alphabetic start
-    if (this.exclusionSet.has(word.toLowerCase())) return;      // user‑excluded
+    if (this.isExcludedWord(word)) return;      // user‑excluded
 
     let replacement = word;
     let changed     = false;
@@ -205,7 +213,7 @@ export default class AutoCorrectPlugin extends Plugin {
     if (wordStart === -1) return;
 
     if (!/^[\p{L}\p{M}]/u.test(word[0])) return;
-    if (this.exclusionSet.has(word.toLowerCase())) return;
+    if (this.isExcludedWord(word)) return;
     if (this.isInProtectedBlock(editor, wordStart, lineNo)) return;
 
     if (word[0] !== word[0].toUpperCase()) {
@@ -221,7 +229,7 @@ export default class AutoCorrectPlugin extends Plugin {
     if (!match) return;
 
     const word = match[0];
-    if (this.exclusionSet.has(word.toLowerCase())) return;
+    if (this.isExcludedWord(word)) return;
 
     const start = line.lastIndexOf(word);
     if (
