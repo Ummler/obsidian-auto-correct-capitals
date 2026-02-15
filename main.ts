@@ -8,6 +8,7 @@ const TRIGGER_CHARS: string[] = [' ', '.', ',', ';', ':', '!', '?', '{', '"', ')
 const LAST_WORD_REGEX: RegExp = /[\p{L}\p{M}']+(?=\W*$)/u;
 const LIST_ITEM_REGEX: RegExp = /^[\t ]*[-*]\s+(\S+)/;
 const NUMBERED_LIST_REGEX: RegExp = /^(\d+)\.\s+(\S+)/;
+const URL_REGEX: RegExp = /https?:\/\/[^\s]*/gi;
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Settings
@@ -262,8 +263,21 @@ export default class AutoCorrectPlugin extends Plugin {
   }
 
   // ──────────────────────────────────────────────────────────────────────
-  // Protected‑block detection (YAML, fenced code/math, inline code/math)
+  // Protected‑block detection (YAML, fenced code/math, inline code/math, URLs)
   // ──────────────────────────────────────────────────────────────────────
+
+  private isInUrl(line: string, pos: number): boolean {
+    URL_REGEX.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = URL_REGEX.exec(line)) !== null) {
+      const urlStart = match.index;
+      const urlEnd = urlStart + match[0].length;
+      if (pos >= urlStart && pos <= urlEnd) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private isInProtectedBlock(editor: Editor, pos: number, lineNo?: number): boolean {
     if (this._lookedForProtectedBlock) return this._isInProtectedBlock;
@@ -271,6 +285,13 @@ export default class AutoCorrectPlugin extends Plugin {
     const doc         = editor.getDoc();
     const currentLine = lineNo !== undefined ? lineNo : doc.getCursor().line;
     const line        = doc.getLine(currentLine);
+
+    // 0) URL detection
+    if (this.isInUrl(line, pos)) {
+      this._isInProtectedBlock = true;
+      this._lookedForProtectedBlock = true;
+      return true;
+    }
 
     // 1) YAML front‑matter
     const firstLine = doc.getLine(0).trim();
