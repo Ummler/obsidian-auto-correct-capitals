@@ -238,7 +238,7 @@ export default class AutoCorrectPlugin extends Plugin {
 
   private correctSentence(editor: Editor, line: string, lineNo: number) {
     const doc          = editor.getDoc();
-    const sentenceRegex = /(?:^|[.!?]\s+)([a-zäöüß])/gu;
+	const sentenceRegex = /(?:^|[.!?]\s+)(\p{Ll})/gu;
     let match: RegExpExecArray | null;
 
     while ((match = sentenceRegex.exec(line))) {
@@ -252,7 +252,7 @@ export default class AutoCorrectPlugin extends Plugin {
 
       const charToCheck = line[charIdx];
       if (
-        !/[A-Za-zÄÖÜäöüß]/.test(charToCheck) ||
+		!/\p{L}/u.test(charToCheck) ||
         this.exclusionSet.has(charToCheck.toLowerCase())
       ) continue;
 
