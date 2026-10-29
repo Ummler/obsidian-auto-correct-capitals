@@ -1,9 +1,11 @@
 {
 	"name": "Auto Correct Capitals Misspellings",
-	"version": "1.1.2",
+	"version": "1.2.0",
 	"description": "Corrects misspelled first letters in words.",
 	"main": "main.js",
 	"scripts": {
+		"test": "node --test tests/*.test.cjs",
+		"benchmark": "node scripts/benchmark.cjs",
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
@@ -12,11 +14,18 @@
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
+		"@codemirror/commands": "6.6.0",
+		"@codemirror/lang-markdown": "6.2.5",
+		"@codemirror/language": "6.10.2",
+		"@codemirror/state": "6.4.1",
+		"@codemirror/view": "6.28.4",
 		"@types/node": "^16.11.6",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
+		"js-yaml": "4.1.1",
+		"jsdom": "26.1.0",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
 		"typescript": "4.7.4"

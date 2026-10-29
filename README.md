@@ -1,72 +1,101 @@
 # Obsidian AutoCorrect Plugin
 
-This plugin automatically fixes common capitalization errors in your Obsidian notes. It specifically targets words where the first two letters are mistakenly capitalized (e.g., `HAllo` instead of `Hallo`) and corrects them. Additionally, new features ensure that list items are formatted correctly and that both codeblocks and math expressions (LaTeX) are protected from auto-correction.
+Correct double initial capitals such as `HAllo` → `Hallo`. Optional rules
+capitalize sentence beginnings and the first word of lists and tasks.
 
-## Features
+## Input behavior
 
-- **Automatic Correction**  
-  The plugin detects words where the first two letters are uppercase and the third letter is lowercase, automatically correcting them (e.g., `HAllo` → `Hallo`).
+Only a complete word entered character by character in the current editor is
+eligible. A whitespace character, Enter, or closing punctuation finishes it.
+Dots, colons and similar ambiguous punctuation defer correction until a definite
+boundary, so an unfinished email address or URL prefix is not changed early.
 
-- **Exclusion List**  
-  You can specify a list of words (comma separated) that should be excluded from any corrections.
+Pasting (even one character), drag-and-drop, completion, templates, composition,
+selection replacements, undo/redo, and unclassified programmatic edits are not
+corrected. A later space does not retroactively correct those words. Editing an
+existing word or moving the cursor during a word also cancels eligibility.
+Multi-cursor changes are conservatively skipped. Typing event labels are input
+hints, not proof of physical key presses; mobile keyboards and third-party
+plugins must be tested separately. IME, swipe input and replacement suggestions
+are deliberately conservative rather than corrected while composing.
 
-- **Abbreviation List**
-  This allows you to define common abbreviations (like `e.g.`, `i.e.`, or `etc.`) that the plugin recognizes. When these abbreviations are used, they prevent the plugin from mistakenly capitalizing words immediately following them, ensuring correct capitalization after abbreviations in your sentences.
+Only the just-finished word changes; old words elsewhere in the line do not.
+CodeMirror applies the delimiter and correction in one transaction, preserving
+selection mapping and normal undo grouping.
 
-- **Optimize List Items**  
-  When the "Capitalize First Letter in List" option is enabled, any line starting with `- `, `* ` or `1. ` will have the first letter of the following word automatically capitalized, also when those are in a Sub-List.
-  
-- **Example:**  
-  - Before:  
-    ```
-    - hallo
-    ```  
-  - After:  
-    ```
-    - Hallo
-    ```  
-  Additionally, if a list item is incorrectly capitalized (e.g., `- HAllo`), the plugin will correct it to `- Hallo`.
+## Settings and command
 
-- **Codeblock Protection**  
-  The plugin detects fenced codeblocks and inline code (using backticks) and skips any corrections within these areas.
+- **Exclusion List:** comma-separated complete words. The comparison ignores
+  case and normalizes Unicode to NFC. All correction rules share the same check;
+  excluding `NB` also protects `NB,` and task/list occurrences.
+- **Capitalize list items:** supports `-`, `*`, `+`, numbered markers `1.` and
+  `1)`, tasks `[ ]`, `[x]`, `[X]`, nesting and quoted lists such as `> - [ ] task`.
+- **Capitalize sentences:** supports Unicode letters, including `æ`, `ø`, `å`,
+  Cyrillic and characters represented by surrogate pairs.
+- **Abbreviations:** comma-separated abbreviations that do not end a sentence,
+  including inside parentheses, for example `This (i.e. that).`.
+- **Respect repeated spelling:** enabled by default. After `HAllo` becomes
+  `Hallo`, deleting and retyping `HAllo` at that location leaves the second and
+  subsequent identical attempts unchanged. The exception is local to that editor
+  and disappears when moving to another word, changing focus, pausing, or
+  changing settings. It never becomes a permanent word exclusion.
+- **Excluded folders:** one vault-relative folder per line, including its
+  subfolders. `Archive` excludes `Archive/Note.md`, not `ArchiveOld/Note.md`.
+- **Pause/resume auto correction:** command-palette command. Pause lasts for this
+  plugin session only. A status-bar label and a notice report its state. Pausing
+  and resuming invalidate previously started words and retry exceptions.
 
-- **Mathblock Protection**  
-  The plugin detects LaTeX math expressions – both inline (delimited by `$...$`) and block math (delimited by `$$...$$`) – and leaves them unchanged. This prevents auto-correction of mathematical notations.
+A note can opt out with a Boolean frontmatter value:
 
-- **YAML Front-matter Protection**
-  The plugin also detects the YAML Frontmatter and wont correct inside it. 
+```yaml
+---
+auto-correct-capitals: false
+---
+```
 
-- **Trigger on Various Characters**  
-  Corrections are triggered by specific punctuation characters (e.g., space, period, comma, etc.) or by pressing Enter. When Enter is pressed, the plugin checks the previous line for corrections (even in lists or quotes).
+The string `"false"` is not the Boolean `false`. Invalid, unfinished or oversized
+frontmatter conservatively disables correction until the header is valid.
 
-## Installation
+## Protected text
 
-### Through Obsidian Community Plugins
+Corrections skip YAML frontmatter, fenced/indented code, inline code, inline and
+display math, HTTP/HTTPS and mailto targets, email addresses, Markdown link
+locations/titles/reference identifiers, and Wikilink note/heading/block targets.
+Visible Markdown link text and explicit Wikilink aliases remain eligible.
+Unfinished destinations are protected while typing. Literal list-looking text
+indented as a Markdown code block stays code; a nested list needs a parent list.
 
-1. Open **Settings** > **Community Plugins** in Obsidian.
-2. Search for "Obsidian AutoCorrect Plugin" and install it.
-3. Enable the plugin.
+The editor's existing syntax tree is queried only when a replacement would
+actually be needed. Small local scanners cover incomplete links and addresses;
+a sparse delimiter-line index supplements math/frontmatter/code boundaries.
+No per-keystroke scan from the start of the document, network call, polling,
+second Markdown parser, or bundled copy of CodeMirror is used.
 
-### Manual Installation
+For bounded work, words/context longer than 4,096 UTF-16 units are skipped, as
+are corrections on lines longer than that. YAML headers over 65,536 UTF-16 units
+opt the note out. Missing syntax coverage skips a correction without forcing
+synchronous parsing. Extremely large pastes or structural edits may require
+updating delimiter metadata, but do not trigger word corrections.
 
-1. Clone or download the repository.
-2. Place the plugin folder in your vault under `.obsidian/plugins/obsidian-auto-correct`.
-3. Restart Obsidian and enable the plugin from the Community Plugins section.
+## Development and validation
 
-## Configuration
+Use Node.js 22 or newer:
 
-The plugin provides three main settings:
+```bash
+npm ci
+npm test
+npm run build
+```
 
-- **Exclusion List**  
-  Enter words (comma separated) that should be excluded from any auto-correction.
+The plugin targets Obsidian 1.5.7 or newer (the installed Obsidian API type
+baseline). CodeMirror packages are development dependencies and runtime imports
+remain external. The plugin version is unchanged until a release is prepared.
+Native acceptance on Obsidian desktop/mobile and the oldest supported version
+is separate from TypeScript and automated transaction tests.
 
-- **Capitalize First Letter in List**  
-  When enabled, any list item (lines starting with `- `or 'x. ' where x is a number) will have the first letter of the following word capitalized.  
-  **Example:**  
-  - Before: `- hallo`  
-  - After: `- Hallo`  
-  Also, if a word such as `- HAllo` is detected, it will be corrected to `- Hallo`.
+See [tests/README.md](tests/README.md) for test details and
+[docs/OBSIDIAN_ACCEPTANCE.md](docs/OBSIDIAN_ACCEPTANCE.md) for native checks.
 
-- **Capitalize Sentence Beginnings**  
-  When enabled, the first letter of the last sentence in a line will be capitalized if it was typed in lowercase.
-
+For a manual installation, copy the built `main.js` and `manifest.json` into
+`<test-vault>/.obsidian/plugins/auto-correct-capitals/`, then enable the plugin
+in that test vault. Keep `data.json` when upgrading an existing installation.
