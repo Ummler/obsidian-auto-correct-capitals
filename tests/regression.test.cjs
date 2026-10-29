@@ -28,7 +28,7 @@ for (const marker of ['-', '*', '1.']) {
 check('existing: nested bullet', '  - hallo ', '  - Hallo ', {
   capitalizeListItem: true,
 });
-check('existing: nested numbered list', '\t1. hallo ', '\t1. Hallo ', {
+check('existing: nested numbered list', '- Parent\n\t1. hallo ', '- Parent\n\t1. Hallo ', {
   capitalizeListItem: true,
 });
 check('existing: list capitalization disabled', '- hallo ', '- hallo ');
@@ -55,8 +55,9 @@ check('existing: Enter corrects previous line', 'HAllo\n', 'Hallo\n', {}, { ente
 
 // Desired behavior: these assertions intentionally fail on the unfixed baseline.
 for (const indent of ['', '  ', '\t']) {
+  const parent = indent === '\t' ? '- Parent\n' : '';
   check(`#12: plus marker with indent ${JSON.stringify(indent)}`,
-    `${indent}+ hallo `, `${indent}+ Hallo `, { capitalizeListItem: true });
+    `${parent}${indent}+ hallo `, `${parent}${indent}+ Hallo `, { capitalizeListItem: true });
 }
 for (const marker of ['-', '*', '+', '1.']) {
   for (const state of [' ', 'x']) {
