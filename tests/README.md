@@ -27,6 +27,8 @@ npm run benchmark
   input, plugin extension registration, pause command and settings migration.
 - `bundle.test.cjs`: CodeMirror and test dependencies remain external to the
   production bundle.
+- `live-driver.test.cjs`: visible-test sequencing, one-code-point input,
+  real-result comparisons, cursor movement, focus-loss abort and partial results.
 
 The source modules and plugin entry point are bundled into a test runtime with
 esbuild. Actual CodeMirror state, Markdown parsing and history run in Node.
@@ -41,7 +43,7 @@ are not a browser/DOM or native Obsidian simulation.
 
 ## Current result
 
-2026-10-29, Node.js v22.23.1: **169 tests passed, 0 failed**. TypeScript and the
+2026-10-29, Node.js v22.23.1: **174 tests passed, 0 failed**. TypeScript and the
 production build pass. The original unfixed baseline was 25 passed / 26 failed;
 the preceding repair branch reached 74 passed / 0 failed before this feature.
 
@@ -62,5 +64,6 @@ Native desktop Source/Live Preview behavior, real DOM event ordering, IME,
 mobile keyboards, the minimum Obsidian version, and repeated plugin unload/load
 still need separate validation. Follow [the native checklist](../docs/OBSIDIAN_ACCEPTANCE.md).
 Headless measurements and their limits are in [PERFORMANCE.md](../docs/PERFORMANCE.md).
+For the visible native diagnostic driver, see [LIVE_TEST.md](../docs/LIVE_TEST.md).
 
 No push, version bump, release, or native acceptance is implied by passing tests.

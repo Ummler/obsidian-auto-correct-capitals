@@ -6,6 +6,10 @@ first in Source mode and then in Live Preview. Test current desktop Obsidian,
 the declared minimum 1.5.7, and supported mobile devices/keyboards separately.
 Do not install this development build into the main vault for acceptance.
 
+For a visible character-by-character run with input-event diagnostics, use
+[the desktop live-test script](LIVE_TEST.md). It records observed failures;
+automated driver tests do not establish that the native run passes.
+
 ## Setup
 
 1. Run `npm ci`, `npm test`, `npm run build` in the repository.
