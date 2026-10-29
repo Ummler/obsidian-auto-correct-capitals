@@ -51,3 +51,21 @@ Verified locally with Node.js v22.23.1 on `fix/capitalization-regressions`:
 `npm test` exits with code 1 because the regressions remain unfixed.
 `npm run build` and `git diff --check` both pass. This is a baseline for the
 subsequent fixes, not a release-ready test result.
+
+## Fixed implementation (2026-10-29)
+
+PR #19 was merged locally with its original commit and authorship retained.
+The other reported issues and HTTP/HTTPS protection were implemented without
+the dependency upgrades from PR #16. Only multiline block state is cached;
+inline code, math and URL membership are evaluated per position.
+
+The suite now includes Unicode surrogate pairs and length-changing casing,
+task/exclusion combinations, custom abbreviations, mixed protection contexts,
+and partially typed URL schemes. The original 51 expectations are retained.
+Run `npm test` and `npm run build` before merging or releasing. Native Obsidian
+validation remains separate from these document-level tests.
+
+Verified result: **74 tests passed, 0 failed**, including all original 51 tests.
+The production build and whitespace checks pass. Tests were run outside the
+execution sandbox because its subprocess restrictions interfered with the
+Node test runner and esbuild workers.

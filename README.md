@@ -8,13 +8,13 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
   The plugin detects words where the first two letters are uppercase and the third letter is lowercase, automatically correcting them (e.g., `HAllo` → `Hallo`).
 
 - **Exclusion List**  
-  You can specify a list of words (comma separated) that should be excluded from any corrections.
+  You can specify a list of words (comma separated) that should be excluded from any corrections. Trailing punctuation is not part of the word: excluding `NB` also protects `- NB, this`.
 
 - **Abbreviation List**
-  This allows you to define common abbreviations (like `e.g.`, `i.e.`, or `etc.`) that the plugin recognizes. When these abbreviations are used, they prevent the plugin from mistakenly capitalizing words immediately following them, ensuring correct capitalization after abbreviations in your sentences.
+  This allows you to define common abbreviations (like `e.g.`, `i.e.`, or `etc.`) that the plugin recognizes. When these abbreviations are used, they prevent the plugin from mistakenly capitalizing words immediately following them, including inside parentheses, such as `This (i.e. that).`.
 
 - **Optimize List Items**  
-  When the "Capitalize First Letter in List" option is enabled, any line starting with `- `, `* ` or `1. ` will have the first letter of the following word automatically capitalized, also when those are in a Sub-List.
+  When the "Capitalize First Letter in List" option is enabled, bullet lists (`- `, `* `, `+ `), numbered lists (`1. `), and task lists (`- [ ] `, `- [x] `) capitalize the first word. Indented lists and tasks are supported.
   
 - **Example:**  
   - Before:  
@@ -35,6 +35,12 @@ This plugin automatically fixes common capitalization errors in your Obsidian no
 
 - **YAML Front-matter Protection**
   The plugin also detects the YAML Frontmatter and wont correct inside it. 
+
+- **URL Protection**
+  HTTP and HTTPS schemes and URL paths are left unchanged, including while typing the scheme. Ordinary text outside the URL can still be corrected.
+
+- **Unicode Sentence Beginnings**
+  Sentence capitalization supports letters such as `æ`, `ø`, `å`, and Cyrillic letters. Unicode characters outside the Basic Multilingual Plane are handled without splitting surrogate pairs.
 
 - **Trigger on Various Characters**  
   Corrections are triggered by specific punctuation characters (e.g., space, period, comma, etc.) or by pressing Enter. When Enter is pressed, the plugin checks the previous line for corrections (even in lists or quotes).
@@ -61,7 +67,7 @@ The plugin provides three main settings:
   Enter words (comma separated) that should be excluded from any auto-correction.
 
 - **Capitalize First Letter in List**  
-  When enabled, any list item (lines starting with `- `or 'x. ' where x is a number) will have the first letter of the following word capitalized.  
+  When enabled, bullet lists (`-`, `*`, `+`), numbered lists, and task lists capitalize their first word, including in nested lists.
   **Example:**  
   - Before: `- hallo`  
   - After: `- Hallo`  

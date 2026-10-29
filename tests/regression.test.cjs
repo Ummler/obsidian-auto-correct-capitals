@@ -101,3 +101,55 @@ check('protection: code word and sentence outside code', '`HAllo` end. next ',
   '`HAllo` end. Next ', { capitalizeSentences: true });
 check('protection: list word and inline code in same line', '- hallo `HAllo` ',
   '- Hallo `HAllo` ', { capitalizeListItem: true });
+
+// Integration cases for the fixes: offsets, settings, punctuation and protection.
+check('#13: task exclusion with punctuation', '- [ ] NB, this ', '- [ ] NB, this ', {
+  capitalizeListItem: true, exclusionList: ['NB'],
+});
+check('#13: numbered exclusion with punctuation', '10. NB: this ', '10. NB: this ', {
+  capitalizeListItem: true, exclusionList: ['NB'],
+});
+check('#13: punctuation does not make an acronym a misspelling', '- NB, this ', '- NB, this ', {
+  capitalizeListItem: true,
+});
+check('#17: uppercase checkbox state', '- [X] task ', '- [X] Task ', {
+  capitalizeListItem: true,
+});
+check('#17: disabled task capitalization', '- [ ] task ', '- [ ] task ');
+check('#17: multiple spaces after task marker', '  + [ ]   task ', '  + [ ]   Task ', {
+  capitalizeListItem: true,
+});
+check('#15: quoted abbreviation', 'This "i.e. that" ', 'This "i.e. that" ', {
+  capitalizeSentences: true,
+});
+check('#15: custom abbreviation retains hyphen', 'This (a-b. that) ', 'This (a-b. that) ', {
+  capitalizeSentences: true, abbreviations: ['a-b.'],
+});
+check('#15: ordinary parenthesized word still ends sentence', 'This (ends. next) ',
+  'This (ends. Next) ', { capitalizeSentences: true });
+check('#18: astral sentence initial', '𐐨word ', '𐐀word ', { capitalizeSentences: true });
+check('#18: Unicode double capitals', 'ÆØble ', 'Æøble ');
+check('#18: astral double capitals', '𐐀𐐁𐐪 ', '𐐀𐐩𐐪 ');
+check('#18: casing expansion preserves following sentence offsets', 'ßeta. next ',
+  'SSeta. Next ', { capitalizeSentences: true });
+check('#18: list casing expansion is not corrected again', '- ßeta ', '- SSeta ', {
+  capitalizeListItem: true,
+});
+check('#18: excluded sentence word', 'iphone ', 'iphone ', {
+  capitalizeSentences: true, exclusionList: ['iPhone'],
+});
+check('#16: URL in task', '- [ ] https://example.com/HAllo ',
+  '- [ ] https://example.com/HAllo ', { capitalizeListItem: true, capitalizeSentences: true });
+check('#16: URL and prose sentence share line', 'https://example.com. next ',
+  'https://example.com. Next ', { capitalizeSentences: true });
+for (const partial of ['http:', 'https:', 'https:/']) {
+  check(`#16: protect URL while typing ${partial}`, partial, partial, {
+    capitalizeSentences: true,
+  });
+}
+check('protection: list and inline math share line', '- hallo $HAllo$ ',
+  '- Hallo $HAllo$ ', { capitalizeListItem: true });
+check('protection: sentence inside code stays unchanged', 'done. `x. next` end. next ',
+  'Done. `x. next` end. Next ', { capitalizeSentences: true });
+check('protection: sentence inside math stays unchanged', 'done. $x. next$ end. next ',
+  'Done. $x. next$ end. Next ', { capitalizeSentences: true });
