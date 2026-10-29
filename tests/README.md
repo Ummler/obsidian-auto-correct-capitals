@@ -30,6 +30,8 @@ npm run benchmark
 - `live-driver.test.cjs`: visible-test sequencing, one-code-point input,
   real-result comparisons, cursor movement, focus-loss abort, partial results,
   reproducible Markdown stress fixtures and timing summaries with missing samples.
+- `compact-report.test.cjs`: compact diagnostics preserve failures and performance
+  measurements while dropping passed text, filler and unrelated event traces.
 
 The source modules and plugin entry point are bundled into a test runtime with
 esbuild. Actual CodeMirror state, Markdown parsing and history run in Node.
@@ -44,7 +46,7 @@ are not a browser/DOM or native Obsidian simulation.
 
 ## Current result
 
-2026-10-29, Node.js v22.23.1: **181 tests passed, 0 failed**. TypeScript and the
+2026-10-29, Node.js v22.23.1: **185 tests passed, 0 failed**. TypeScript and the
 production build pass. The original unfixed baseline was 25 passed / 26 failed;
 the preceding repair branch reached 74 passed / 0 failed before this feature.
 

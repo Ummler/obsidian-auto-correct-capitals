@@ -192,3 +192,22 @@ für den nächsten Lauf; laufende Tests bleiben unverändert.
 Die zwei bereits beobachteten Fehler (Cursor direkt vor einem bestehenden Wort
 und Enter) bleiben im Skript enthalten. Diese Erweiterung ändert den Plugin-Code
 nicht und setzt deren Ergebnis nicht künstlich auf PASS.
+
+## Kompakte Auswertung zum Kopieren
+
+Die ursprüngliche Testnotiz (oder ihre `-events.json`) öffnen und in der
+Obsidian-Entwicklerkonsole ausführen:
+
+```js
+eval(require('fs').readFileSync('/home/ummel/Projects/obsidian-auto-correct-capitals/scripts/obsidian-compact-report.js', 'utf8'))
+```
+
+Das Skript liest die zugehörige strukturierte Diagnose und öffnet eine neue
+`…-Auswertung-….md`. Originalnotiz und JSON bleiben unverändert. Die neue Notiz
+enthält Gesamtzahlen, Einstellungen, fehlgeschlagene Prüfungen, Laufzeitwerte
+einschließlich Dokumentgrößen sowie maximal 32 Eingabeereignisse pro Fehlerfall.
+Bestandene Testtexte, Fülltext und nicht zu Fehlern gehörende Rohereignisse
+entfallen. Laufzeitwerte bleiben auch bei bestandenem Texttest erhalten.
+
+Entwicklerkonsole schließen, in der neuen Notiz alles markieren und kopieren.
+Es wird nichts automatisch in die Zwischenablage oder ins Netzwerk geschrieben.
