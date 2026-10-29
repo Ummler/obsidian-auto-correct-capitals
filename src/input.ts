@@ -3,6 +3,8 @@ import { CorrectionPolicy } from './settings';
 import { DELIMITER, LETTER, MAX_CONTEXT, replacementFor, WORD_CHAR } from './correction';
 import { blockContext } from './blocks';
 import { headerPolicy } from './exclusions';
+import { ViewPlugin } from '@codemirror/view';
+import { CorrectionDiagnostics } from './diagnostics';
 
 export const typedEnter = Annotation.define<boolean>();
 export const blockedInput = Annotation.define<boolean>();
@@ -39,8 +41,9 @@ function decide(tr: Transaction, run?: Run): Decision {
     // A new run must start at a word boundary, never in an existing word.
     const previous = tr.startState.doc.sliceString(Math.max(0, change.from - 2), change.from);
     const last = Array.from(previous).pop();
-    const next = Array.from(tr.startState.doc.sliceString(change.from, change.from + 2))[0];
-    if (LETTER.test(char) && !(last && WORD_CHAR.test(last)) && !(next && WORD_CHAR.test(next))) {
+    // The suffix may belong to an existing word. Only the newly typed span is
+    // owned; a subsequently typed delimiter separates it from that suffix.
+    if (LETTER.test(char) && !(last && WORD_CHAR.test(last))) {
       return { run: { from: change.from, to: change.end } };
     }
   }
@@ -56,8 +59,9 @@ function decide(tr: Transaction, run?: Run): Decision {
 }
 
 export function correctionExtension(getPolicy: () => CorrectionPolicy,
-  protectedAt: (state: EditorState, from: number, to: number) => boolean,
-  getFilePath: (state: EditorState) => string | null = () => 'Note.md'): Extension {
+  protectedAt: (state: EditorState, from: number, to: number) => boolean | 'clear' | 'protected' | 'pending',
+  getFilePath: (state: EditorState) => string | null = () => 'Note.md',
+  diagnostics?: CorrectionDiagnostics): Extension {
   const eligibility = StateField.define<{ path: string | null; policy: CorrectionPolicy; allowed: boolean }>({
     create: state => {
       const path = getFilePath(state), policy = getPolicy();
@@ -106,18 +110,77 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
       return { run, retry, policy };
     },
   });
-  return [blockContext, headerPolicy, eligibility, tracking, EditorState.transactionFilter.of(tr => {
-    if (!enabled(tr.startState) || tr.effects.some(effect => effect.is(resetTracking))) return tr;
+  interface Pending { from: number; to: number; original: string; replacement: string;
+    policy: CorrectionPolicy; path: string | null; head: number; time: number }
+  const defer = StateEffect.define<Pending | null>();
+  const pending = StateField.define<Pending | null>({
+    create: () => null,
+    update(old, tr) {
+      const effect = tr.effects.find(effect => effect.is(defer));
+      if (effect) return effect.value;
+      if (tr.docChanged || tr.selection || tr.effects.some(effect => effect.is(resetTracking)) ||
+        old && (old.policy !== getPolicy() || old.path !== getFilePath(tr.startState) || Date.now() - old.time > 400)) {
+        if (old) diagnostics?.emit(tr.docChanged ? 'pending-cancelled-edit' : 'pending-cancelled-context',
+          tr.newDoc.length, old.from, old.to, tr.annotation(Transaction.userEvent));
+        return null;
+      }
+      return old;
+    },
+  });
+  const retryParsing = ViewPlugin.define(view => {
+    let destroyed = false;
+    return {
+      destroy() { destroyed = true; },
+      update() {
+        const candidate = view.state.field(pending);
+        if (!candidate || Date.now() - candidate.time > 400 || !enabled(view.state) ||
+          protectedAt(view.state, candidate.from, candidate.to) === 'pending') return;
+        // Parser progress may arrive without a document edit. Never dispatch
+        // recursively from a view update or force parsing on the typing path.
+        Promise.resolve().then(() => {
+          if (destroyed || view.state.field(pending, false) !== candidate) return;
+          const state = view.state;
+          if (Date.now() - candidate.time > 400 || !enabled(state) ||
+            candidate.policy !== getPolicy() || candidate.path !== getFilePath(state) ||
+            state.selection.main.head !== candidate.head) return;
+          const status = protectedAt(state, candidate.from, candidate.to);
+          const clear = status === false || status === 'clear';
+          diagnostics?.emit(clear ? 'applied-after-parse' : 'protected-after-parse', state.doc.length, candidate.from, candidate.to);
+          view.dispatch({ effects: defer.of(null),
+            changes: clear ? { from: candidate.from, to: candidate.to, insert: candidate.replacement } : undefined,
+            annotations: clear ? [ownCorrection.of(true), Transaction.time.of(candidate.time),
+              correctedWord.of({ from: candidate.from, to: candidate.from + candidate.replacement.length,
+                original: candidate.original })] : undefined });
+        });
+      },
+    };
+  });
+  return [blockContext, headerPolicy, eligibility, tracking, pending, retryParsing, EditorState.transactionFilter.of(tr => {
+    if (!enabled(tr.startState) || tr.effects.some(effect => effect.is(resetTracking))) {
+      if (tr.docChanged) diagnostics?.emit('disabled-or-reset', tr.newDoc.length, undefined, undefined, tr.annotation(Transaction.userEvent));
+      return tr;
+    }
     const previous = tr.startState.field(tracking);
     const policy = getPolicy();
     if (previous.policy !== policy) return tr;
     const candidate = decide(tr, previous.run).correction;
-    if (!candidate) return tr;
+    const event = tr.annotation(Transaction.userEvent);
+    const log = (reason: string) => diagnostics?.emit(reason, tr.newDoc.length, candidate?.from, candidate?.to, event);
+    if (!candidate) { if (tr.docChanged) log('no-owned-word'); return tr; }
     const original = tr.startState.doc.sliceString(candidate.from, candidate.to);
     if (policy.settings.respectRepeatedSpelling && previous.retry?.from === candidate.from &&
-      previous.retry.original === original) return tr;
+      previous.retry.original === original) { log('deliberate-retry'); return tr; }
     const replacement = replacementFor(tr.startState, candidate.from, candidate.to, policy);
-    if (!replacement || protectedAt(tr.startState, candidate.from, candidate.to)) return tr;
+    if (!replacement) { log('unchanged-or-excluded'); return tr; }
+    const protection = protectedAt(tr.startState, candidate.from, candidate.to);
+    if (protection === 'pending') {
+      log('syntax-pending');
+      return [tr, { effects: defer.of({ ...candidate, original, replacement, policy,
+        path: getFilePath(tr.startState), head: tr.newSelection.main.head,
+        time: tr.annotation(Transaction.time) || Date.now() }) }];
+    }
+    if (protection === true || protection === 'protected') { log('protected'); return tr; }
+    log('applied');
     return [tr, {
       sequential: true,
       changes: { from: candidate.from, to: candidate.to, insert: replacement },

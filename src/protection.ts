@@ -8,19 +8,24 @@ const protectedNode = (name: string): boolean =>
 
 // This function never forces parsing or reads a prefix of the document.
 export function isProtected(state: EditorState, from: number, to: number): boolean {
-  if (blockProtected(state, from) || !syntaxTreeAvailable(state, to)) return true;
+  return protectionStatus(state, from, to) !== 'clear';
+}
+
+export function protectionStatus(state: EditorState, from: number, to: number): 'clear' | 'protected' | 'pending' {
+  if (blockProtected(state, from)) return 'protected';
+  if (!syntaxTreeAvailable(state, to)) return 'pending';
   const tree = syntaxTree(state);
   for (let node = tree.resolveInner(from, 1); node; node = node.parent!) {
-    if (protectedNode(node.name)) return true;
+    if (protectedNode(node.name)) return 'protected';
   }
   let protectedChild = false;
   tree.iterate({ from, to, enter(node) {
     if (protectedNode(node.name)) protectedChild = true;
   } });
-  if (protectedChild) return true;
+  if (protectedChild) return 'protected';
   const line = state.doc.lineAt(from);
   // Skip pathological long lines rather than run unbounded regexes/scanners.
-  if (line.length > MAX_CONTEXT) return true;
+  if (line.length > MAX_CONTEXT) return 'protected';
   // Include a bounded lookbehind for unfinished multiline link destinations
   // and titles. Never copy the document prefix or an unbounded paragraph.
   let contextStart = Math.max(0, line.to - MAX_CONTEXT);
@@ -30,7 +35,7 @@ export function isProtected(state: EditorState, from: number, to: number): boole
     contextStart += paragraphBreak + 2;
     text = text.slice(paragraphBreak + 2);
   }
-  return localProtected(text, from - contextStart, to - contextStart);
+  return localProtected(text, from - contextStart, to - contextStart) ? 'protected' : 'clear';
 }
 
 export function localProtected(text: string, from: number, to: number): boolean {

@@ -1,16 +1,24 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { editorExtension } from './src/editor';
 import { AutoCorrectSettings, CorrectionPolicy, DEFAULT_SETTINGS, loadSettings } from './src/settings';
+import { CorrectionDiagnostic, CorrectionDiagnostics } from './src/diagnostics';
 
 export default class AutoCorrectPlugin extends Plugin {
   settings: AutoCorrectSettings = { ...DEFAULT_SETTINGS };
   private policy = new CorrectionPolicy(this.settings);
   private paused = false;
   private status?: HTMLElement;
+  private diagnostics = new CorrectionDiagnostics();
+
+  observeCorrections(listener: (event: CorrectionDiagnostic) => void): () => void {
+    return this.diagnostics.observe(listener);
+  }
+
+  onunload() { this.diagnostics.clear(); }
 
   async onload() {
     await this.loadSettings();
-    this.registerEditorExtension(editorExtension(() => this.policy));
+    this.registerEditorExtension(editorExtension(() => this.policy, this.diagnostics));
     this.addSettingTab(new AutoCorrectSettingTab(this.app, this));
     this.status = this.addStatusBarItem();
     this.updateStatus();

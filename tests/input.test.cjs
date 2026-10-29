@@ -71,9 +71,17 @@ test('tab-indented code is not a nested list without a parent', () => {
   const e = editor('\t1. ', { capitalizeListItem: true }); e.type('hallo ');
   assert.equal(e.text(), '\t1. hallo ');
 });
-test('inserting at the start of an existing word does not claim its ownership', () => {
+test('a typed delimiter separates a newly inserted word from the existing suffix', () => {
   const e = editor('world'); e.apply({ selection: { anchor: 0 } });
-  e.type('HAllo '); assert.equal(e.text(), 'HAllo world');
+  e.type('HAllo '); assert.equal(e.text(), 'Hallo world');
+});
+test('one-space cursor insertion corrects only the newly typed word', () => {
+  const e = editor('Wort Wort HAllo'); e.apply({ selection: { anchor: 5 } });
+  e.type('TEst '); assert.equal(e.text(), 'Wort Test Wort HAllo');
+});
+test('typing inside an existing word never claims that word', () => {
+  const e = editor('xxrest'); e.apply({ selection: { anchor: 2 } });
+  e.type('TEst '); assert.equal(e.text(), 'xxTEst rest');
 });
 test('single-character paste does not make the rest of the word eligible', () => {
   const e = editor();

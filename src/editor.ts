@@ -2,10 +2,11 @@ import { EditorState, Extension, Prec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { blockedInput, correctionExtension, resetTracking, typedEnter } from './input';
 import { CorrectionPolicy } from './settings';
-import { isProtected } from './protection';
+import { protectionStatus } from './protection';
+import { CorrectionDiagnostics } from './diagnostics';
 import { editorInfoField } from 'obsidian';
 
-export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
+export function editorExtension(getPolicy: () => CorrectionPolicy, diagnostics?: CorrectionDiagnostics): Extension {
   // Evidence belongs to a particular state, and is consumed by its next edit.
   // Do not expire at a microtask: DOMObserver may flush after beforeinput.
   const evidence = new WeakMap<EditorState, { enter?: boolean; blocked?: boolean }>();
@@ -14,7 +15,8 @@ export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
     evidence.set(state, value);
   };
   return [
-    EditorView.domEventHandlers({
+    // Observers run even when a higher-priority keymap consumes Enter.
+    EditorView.domEventObservers({
       keydown(event, view) {
         if (event.key === 'Enter' && !event.isComposing) remember(view, { enter: true });
         else evidence.delete(view.state);
@@ -51,7 +53,7 @@ export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
       if (tr.docChanged) evidence.delete(tr.startState);
       return [tr, { annotations: [typedEnter.of(!!intent.enter), blockedInput.of(!!intent.blocked)] }];
     })),
-    correctionExtension(getPolicy, isProtected,
-      state => state.field(editorInfoField, false)?.file?.path || null),
+    correctionExtension(getPolicy, protectionStatus,
+      state => state.field(editorInfoField, false)?.file?.path || null, diagnostics),
   ];
 }

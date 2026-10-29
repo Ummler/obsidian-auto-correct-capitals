@@ -9,12 +9,12 @@ const { editorExtension, CorrectionPolicy, DEFAULT_SETTINGS, testEditorInfoField
 
 function registeredEditor(factory) {
   let handlers;
-  const original = EditorView.domEventHandlers;
+  const original = EditorView.domEventObservers;
   let extension;
   try {
-    EditorView.domEventHandlers = value => { handlers = value; return original(value); };
+    EditorView.domEventObservers = value => { handlers = value; return original(value); };
     extension = factory();
-  } finally { EditorView.domEventHandlers = original; }
+  } finally { EditorView.domEventObservers = original; }
   const view = {
     state: EditorState.create({ extensions: [markdown(), testEditorInfoField, extension] }),
     dispatch(spec) {
@@ -89,6 +89,25 @@ test('pause command gates the actual extension registered by the plugin', async 
   plugin.commands[0].callback(); type('HAllo ');
   plugin.commands[0].callback(); type('HAllo ');
   assert.equal(state.doc.toString(), 'HAllo Hallo ');
+});
+test('optional diagnostic observers cannot break typing and are cleared on unload', async () => {
+  const plugin = new AutoCorrectPlugin(); await plugin.onload();
+  const reasons = [];
+  plugin.observeCorrections(() => { throw new Error('Observer failure'); });
+  const stop = plugin.observeCorrections(event => reasons.push(event.reason));
+  let state = EditorState.create({ extensions: [markdown(), testEditorInfoField, plugin.extensions] });
+  const type = text => {
+    for (const char of text) {
+      ensureSyntaxTree(state, state.doc.length, 1000);
+      const pos = state.selection.main.head;
+      state = state.update({ changes: { from: pos, insert: char }, selection: { anchor: pos + char.length }, userEvent: 'input.type' }).state;
+    }
+  };
+  type('HAllo '); assert.equal(state.doc.toString(), 'Hallo ');
+  assert.ok(reasons.includes('applied'));
+  plugin.onunload(); const count = reasons.length;
+  type('TEst '); assert.equal(reasons.length, count);
+  stop(); stop();
 });
 test('settings migration validates types and keeps old options', () => {
   const settings = loadSettings({ capitalizeListItem: true, exclusionList: [' NB ', 42],
