@@ -37,6 +37,16 @@ class AutoCorrectSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: 'AutoCorrect Plugin Settings' });
 
+    new Setting(containerEl)
+      .setName('Respect repeated spelling')
+      .setDesc('After a correction, keep an identical spelling retyped at the same location. Moving to another word clears this temporary exception.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.respectRepeatedSpelling)
+        .onChange(async value => {
+          this.plugin.settings.respectRepeatedSpelling = value;
+          await this.plugin.saveSettings();
+        }));
+
     // Exclusion list
     new Setting(containerEl)
       .setName('Exclusion List')

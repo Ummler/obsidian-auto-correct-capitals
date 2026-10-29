@@ -5,6 +5,8 @@ import { DELIMITER, LETTER, MAX_CONTEXT, replacementFor, WORD_CHAR } from './cor
 export const typedEnter = Annotation.define<boolean>();
 export const blockedInput = Annotation.define<boolean>();
 export const ownCorrection = Annotation.define<boolean>();
+interface Retry extends Run { original: string }
+const correctedWord = Annotation.define<Retry>();
 interface Run { from: number; to: number }
 interface Decision { run?: Run; correction?: { from: number; to: number; insert: string } }
 
@@ -45,19 +47,51 @@ function decide(tr: Transaction, run?: Run): Decision {
 
 export function correctionExtension(getPolicy: () => CorrectionPolicy,
   protectedAt: (state: EditorState, from: number, to: number) => boolean): Extension {
-  const tracking = StateField.define<Run | undefined>({
-    create: () => undefined,
-    update: (run, tr) => decide(tr, run).run,
+  interface Tracking { run?: Run; retry?: Retry; policy: CorrectionPolicy }
+  const tracking = StateField.define<Tracking>({
+    create: () => ({ policy: getPolicy() }),
+    update: (old, tr) => {
+      const policy = getPolicy();
+      if (old.policy !== policy) return { policy };
+      const record = tr.annotation(correctedWord);
+      if (record) return { retry: record, policy };
+      const run = decide(tr, old.run).run;
+      let retry = old.retry;
+      if (!policy.settings.respectRepeatedSpelling) retry = undefined;
+      if (retry && tr.docChanged) {
+        const event = tr.annotation(Transaction.userEvent) || '';
+        if (!/^(input\.type|delete(?:\..*)?|undo|redo)$/.test(event) || tr.annotation(blockedInput)) {
+          retry = undefined;
+        } else {
+          retry = { ...retry, from: tr.changes.mapPos(retry.from, -1),
+            to: tr.changes.mapPos(retry.to, 1) };
+          if (run && run.from !== retry.from) retry = undefined;
+        }
+      }
+      if (retry && tr.selection &&
+        (tr.newSelection.main.head < retry.from || tr.newSelection.main.head > retry.to + 1)) {
+        retry = undefined;
+      }
+      return { run, retry, policy };
+    },
   });
   return [tracking, EditorState.transactionFilter.of(tr => {
-    const candidate = decide(tr, tr.startState.field(tracking)).correction;
+    const previous = tr.startState.field(tracking);
+    const policy = getPolicy();
+    if (previous.policy !== policy) return tr;
+    const candidate = decide(tr, previous.run).correction;
     if (!candidate) return tr;
-    const replacement = replacementFor(tr.startState, candidate.from, candidate.to, getPolicy());
+    const original = tr.startState.doc.sliceString(candidate.from, candidate.to);
+    if (policy.settings.respectRepeatedSpelling && previous.retry?.from === candidate.from &&
+      previous.retry.original === original) return tr;
+    const replacement = replacementFor(tr.startState, candidate.from, candidate.to, policy);
     if (!replacement || protectedAt(tr.startState, candidate.from, candidate.to)) return tr;
     return [tr, {
       sequential: true,
       changes: { from: candidate.from, to: candidate.to, insert: replacement },
-      annotations: ownCorrection.of(true),
+      annotations: [ownCorrection.of(true), correctedWord.of({
+        from: candidate.from, to: candidate.from + replacement.length, original,
+      })],
     }];
   })];
 }

@@ -5,25 +5,7 @@ const { markdown } = require('@codemirror/lang-markdown');
 const { ensureSyntaxTree } = require('@codemirror/language');
 const { CorrectionPolicy, DEFAULT_SETTINGS, correctionExtension, isProtected, typedEnter } = require('./helpers/runtime.cjs');
 
-function editor(doc = '', settings = {}, protection = isProtected) {
-  const policy = new CorrectionPolicy({ ...DEFAULT_SETTINGS, ...settings });
-  let state = EditorState.create({ doc, selection: { anchor: doc.length },
-    extensions: [markdown(), correctionExtension(() => policy, protection)] });
-  const apply = spec => {
-    ensureSyntaxTree(state, state.doc.length, 1000);
-    const tr = state.update(spec);
-    state = tr.state;
-    return tr;
-  };
-  return {
-    get state() { return state; }, apply,
-    type(text) {
-      for (const char of text) apply({ changes: { from: state.selection.main.head, insert: char },
-        userEvent: 'input.type', selection: { anchor: state.selection.main.head + char.length } });
-    },
-    text: () => state.doc.toString(),
-  };
-}
+const { editor } = require('./helpers/session.cjs');
 
 test('only the word before the cursor changes', () => {
   const e = editor('Existing.  TEst ');
@@ -89,5 +71,3 @@ test('tab-indented code is not a nested list without a parent', () => {
   const e = editor('\t1. ', { capitalizeListItem: true }); e.type('hallo ');
   assert.equal(e.text(), '\t1. hallo ');
 });
-
-module.exports = { editor };

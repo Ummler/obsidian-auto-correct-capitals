@@ -3,11 +3,13 @@ export interface AutoCorrectSettings {
   capitalizeListItem: boolean;
   capitalizeSentences: boolean;
   abbreviations: string[];
+  respectRepeatedSpelling: boolean;
 }
 
 export const DEFAULT_SETTINGS: AutoCorrectSettings = {
   exclusionList: [], capitalizeListItem: false, capitalizeSentences: false,
   abbreviations: ['e.g.', 'i.e.', 'etc.', 'vs.'],
+  respectRepeatedSpelling: true,
 };
 
 export const normalizeWord = (word: string): string => word.normalize('NFC').toLowerCase();
