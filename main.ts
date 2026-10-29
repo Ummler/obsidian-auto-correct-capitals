@@ -1,24 +1,42 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { editorExtension } from './src/editor';
-import { AutoCorrectSettings, CorrectionPolicy, DEFAULT_SETTINGS } from './src/settings';
+import { AutoCorrectSettings, CorrectionPolicy, DEFAULT_SETTINGS, loadSettings } from './src/settings';
 
 export default class AutoCorrectPlugin extends Plugin {
   settings: AutoCorrectSettings = { ...DEFAULT_SETTINGS };
   private policy = new CorrectionPolicy(this.settings);
+  private paused = false;
+  private status?: HTMLElement;
 
   async onload() {
     await this.loadSettings();
     this.registerEditorExtension(editorExtension(() => this.policy));
     this.addSettingTab(new AutoCorrectSettingTab(this.app, this));
+    this.status = this.addStatusBarItem();
+    this.updateStatus();
+    this.addCommand({
+      id: 'toggle-auto-correction',
+      name: 'Pause/resume auto correction',
+      callback: () => {
+        this.paused = !this.paused;
+        this.policy = new CorrectionPolicy(this.settings, this.paused);
+        this.updateStatus();
+        new Notice(this.paused ? 'Auto correction paused' : 'Auto correction resumed');
+      },
+    });
+  }
+
+  private updateStatus() {
+    this.status?.setText(this.paused ? 'AutoCorrect: paused' : 'AutoCorrect: on');
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    this.policy = new CorrectionPolicy(this.settings);
+    this.settings = loadSettings(await this.loadData());
+    this.policy = new CorrectionPolicy(this.settings, this.paused);
   }
 
   async saveSettings() {
-    this.policy = new CorrectionPolicy(this.settings);
+    this.policy = new CorrectionPolicy(this.settings, this.paused);
     await this.saveData(this.settings);
   }
 }

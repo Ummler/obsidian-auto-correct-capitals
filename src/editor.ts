@@ -1,6 +1,6 @@
 import { EditorState, Extension, Prec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { blockedInput, correctionExtension, typedEnter } from './input';
+import { blockedInput, correctionExtension, resetTracking, typedEnter } from './input';
 import { CorrectionPolicy } from './settings';
 import { isProtected } from './protection';
 import { editorInfoField } from 'obsidian';
@@ -28,6 +28,16 @@ export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
       },
       paste(_event, view) { remember(view, { blocked: true }); return false; },
       drop(_event, view) { remember(view, { blocked: true }); return false; },
+      blur(_event, view) {
+        evidence.delete(view.state);
+        view.dispatch({ effects: resetTracking.of(null) });
+        return false;
+      },
+      compositionstart(_event, view) {
+        remember(view, { blocked: true });
+        view.dispatch({ effects: resetTracking.of(null) });
+        return false;
+      },
     }),
     // Filters run in reverse order; lowest precedence adds evidence first.
     Prec.lowest(EditorState.transactionFilter.of(tr => {

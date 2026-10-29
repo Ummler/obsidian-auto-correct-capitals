@@ -1,0 +1,91 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { EditorState } = require('@codemirror/state');
+const { EditorView } = require('@codemirror/view');
+const { markdown } = require('@codemirror/lang-markdown');
+const { ensureSyntaxTree } = require('@codemirror/language');
+const { editorExtension, CorrectionPolicy, DEFAULT_SETTINGS, testEditorInfoField,
+  AutoCorrectPlugin, loadSettings, resetTracking } = require('./helpers/runtime.cjs');
+
+function registeredEditor(factory) {
+  let handlers;
+  const original = EditorView.domEventHandlers;
+  let extension;
+  try {
+    EditorView.domEventHandlers = value => { handlers = value; return original(value); };
+    extension = factory();
+  } finally { EditorView.domEventHandlers = original; }
+  const view = {
+    state: EditorState.create({ extensions: [markdown(), testEditorInfoField, extension] }),
+    dispatch(spec) {
+      ensureSyntaxTree(this.state, this.state.doc.length, 1000);
+      this.state = this.state.update(spec).state;
+    },
+  };
+  const type = text => {
+    for (const char of text) {
+      handlers.beforeinput({ inputType: 'insertText', isComposing: false }, view);
+      const pos = view.state.selection.main.head;
+      view.dispatch({ changes: { from: pos, insert: char }, selection: { anchor: pos + char.length }, userEvent: 'input.type' });
+    }
+  };
+  return { view, handlers, type, text: () => view.state.doc.toString() };
+}
+const make = () => registeredEditor(() => editorExtension(() => newPolicy));
+const newPolicy = new CorrectionPolicy({ ...DEFAULT_SETTINGS });
+
+test('registered beforeinput gate rejects replacement input mislabeled as typing', () => {
+  const e = make();
+  e.handlers.beforeinput({ inputType: 'insertReplacementText', isComposing: false }, e.view);
+  e.view.dispatch({ changes: { from: 0, insert: 'H' }, selection: { anchor: 1 }, userEvent: 'input.type' });
+  e.type('Allo '); assert.equal(e.text(), 'HAllo ');
+});
+test('registered Enter evidence reaches correction filter before it runs', () => {
+  const e = make(); e.type('HAllo');
+  e.handlers.keydown({ key: 'Enter', isComposing: false }, e.view);
+  e.view.dispatch({ changes: { from: 5, insert: '\n' }, selection: { anchor: 6 }, userEvent: 'input' });
+  assert.equal(e.text(), 'Hallo\n');
+});
+test('blur clears typed ownership', () => {
+  const e = make(); e.type('HAllo'); e.handlers.blur({}, e.view); e.type(' ');
+  assert.equal(e.text(), 'HAllo ');
+});
+test('composition start clears typed ownership', () => {
+  const e = make(); e.type('HAllo'); e.handlers.compositionstart({}, e.view); e.type(' ');
+  assert.equal(e.text(), 'HAllo ');
+});
+test('Enter evidence expires without a corresponding transaction', async () => {
+  const e = make(); e.type('HAllo');
+  e.handlers.keydown({ key: 'Enter', isComposing: false }, e.view);
+  await Promise.resolve();
+  e.view.dispatch({ changes: { from: 5, insert: '\n' }, userEvent: 'input' });
+  assert.equal(e.text(), 'HAllo\n');
+});
+test('plugin registers editor-owned hooks and session-only pause command', async () => {
+  const plugin = new AutoCorrectPlugin(); await plugin.onload();
+  assert.equal(plugin.extensions.length, 1);
+  assert.equal(plugin.commands[0].id, 'toggle-auto-correction');
+  plugin.commands[0].callback(); assert.equal(plugin.statusText, 'AutoCorrect: paused');
+  await plugin.saveSettings(); assert.equal('paused' in plugin.saved, false);
+  plugin.commands[0].callback(); assert.equal(plugin.statusText, 'AutoCorrect: on');
+});
+test('settings migration validates types and keeps old options', () => {
+  const settings = loadSettings({ capitalizeListItem: true, exclusionList: [' NB ', 42],
+    abbreviations: null, excludedFolders: ['Archive'], respectRepeatedSpelling: 'false' });
+  assert.equal(settings.capitalizeListItem, true);
+  assert.equal(settings.exclusionList.join(), 'NB');
+  assert.equal(settings.abbreviations.includes('i.e.'), true);
+  assert.equal(settings.respectRepeatedSpelling, true);
+});
+test('resuming resets a previously started word and accepts a fresh word', () => {
+  const { editor } = require('./helpers/session.cjs');
+  const e = editor(); e.type('HAllo'); e.pause(true); e.type(' '); e.pause(false);
+  e.type('HAllo '); assert.equal(e.text(), 'HAllo Hallo ');
+});
+test('focus reset clears deliberate-retry exception', () => {
+  const { editor } = require('./helpers/session.cjs');
+  const e = editor(); e.type('HAllo ');
+  e.apply({ effects: resetTracking.of(null) });
+  e.apply({ changes: { from: 0, to: 6 }, selection: { anchor: 0 }, userEvent: 'delete.backward' });
+  e.type('HAllo '); assert.equal(e.text(), 'Hallo ');
+});

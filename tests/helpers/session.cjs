@@ -16,6 +16,7 @@ function editor(doc = '', settings = {}, protection = isProtected, initialPath =
   return {
     get state() { return state; }, apply,
     configure(settings) { policy = new CorrectionPolicy({ ...policy.settings, ...settings }); apply({}); },
+    pause(value) { policy = new CorrectionPolicy(policy.settings, value); apply({}); },
     setFilePath(path) { filePath = path; apply({}); },
     type(text) {
       for (const char of text) apply({ changes: { from: state.selection.main.head, insert: char },

@@ -1,4 +1,4 @@
-import { Annotation, EditorState, Extension, StateField, Transaction } from '@codemirror/state';
+import { Annotation, EditorState, Extension, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { CorrectionPolicy } from './settings';
 import { DELIMITER, LETTER, MAX_CONTEXT, replacementFor, WORD_CHAR } from './correction';
 import { blockContext } from './blocks';
@@ -7,6 +7,7 @@ import { headerPolicy } from './exclusions';
 export const typedEnter = Annotation.define<boolean>();
 export const blockedInput = Annotation.define<boolean>();
 export const ownCorrection = Annotation.define<boolean>();
+export const resetTracking = StateEffect.define<null>();
 interface Retry extends Run { original: string }
 const correctedWord = Annotation.define<Retry>();
 interface Run { from: number; to: number; tail?: number }
@@ -68,19 +69,23 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
   });
   const enabled = (state: EditorState) => {
     const file = state.field(eligibility);
-    return file.allowed && file.path === getFilePath(state) && file.policy === getPolicy() &&
-      !state.field(headerPolicy).disabled;
+    const path = getFilePath(state), policy = getPolicy();
+    const allowed = file.path === path && file.policy === policy ? file.allowed
+      : path !== null && !policy.excludesPath(path);
+    return !policy.paused && allowed && !state.field(headerPolicy).disabled;
   };
   interface Tracking { run?: Run; retry?: Retry; policy: CorrectionPolicy }
   const tracking = StateField.define<Tracking>({
     create: () => ({ policy: getPolicy() }),
     update: (old, tr) => {
       const policy = getPolicy();
-      if (old.policy !== policy || !enabled(tr.startState)) return { policy };
+      if (!enabled(tr.startState) || tr.effects.some(effect => effect.is(resetTracking))) return { policy };
+      const previous = old.policy === policy &&
+        tr.startState.field(eligibility).path === getFilePath(tr.startState) ? old : { policy };
       const record = tr.annotation(correctedWord);
       if (record) return { retry: record, policy };
-      const run = decide(tr, old.run).run;
-      let retry = old.retry;
+      const run = decide(tr, previous.run).run;
+      let retry = previous.retry;
       if (!policy.settings.respectRepeatedSpelling) retry = undefined;
       if (retry && tr.docChanged) {
         const event = tr.annotation(Transaction.userEvent) || '';
@@ -100,7 +105,7 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
     },
   });
   return [blockContext, headerPolicy, eligibility, tracking, EditorState.transactionFilter.of(tr => {
-    if (!enabled(tr.startState)) return tr;
+    if (!enabled(tr.startState) || tr.effects.some(effect => effect.is(resetTracking))) return tr;
     const previous = tr.startState.field(tracking);
     const policy = getPolicy();
     if (previous.policy !== policy) return tr;
