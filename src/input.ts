@@ -16,7 +16,11 @@ interface Run { from: number; to: number; tail?: number }
 interface Decision { run?: Run; correction?: { from: number; to: number; insert: string } }
 
 function decide(tr: Transaction, run?: Run): Decision {
-  if (!tr.docChanged) return { run: tr.selection ? undefined : run };
+  if (!tr.docChanged) {
+    // Widget/view updates may reassert the current selection. Only an actual
+    // selection change relinquishes ownership of the word being typed.
+    return { run: tr.selection && !tr.newSelection.eq(tr.startState.selection) ? undefined : run };
+  }
   if (tr.annotation(blockedInput) || tr.startState.selection.ranges.length !== 1 ||
     !tr.startState.selection.main.empty) return {};
   const event = tr.annotation(Transaction.userEvent);
@@ -118,7 +122,7 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
     update(old, tr) {
       const effect = tr.effects.find(effect => effect.is(defer));
       if (effect) return effect.value;
-      if (tr.docChanged || tr.selection || tr.effects.some(effect => effect.is(resetTracking)) ||
+      if (tr.docChanged || tr.selection && !tr.newSelection.eq(tr.startState.selection) || tr.effects.some(effect => effect.is(resetTracking)) ||
         old && (old.policy !== getPolicy() || old.path !== getFilePath(tr.startState) || Date.now() - old.time > 400)) {
         if (old) diagnostics?.emit(tr.docChanged ? 'pending-cancelled-edit' : 'pending-cancelled-context',
           tr.newDoc.length, old.from, old.to, tr.annotation(Transaction.userEvent));

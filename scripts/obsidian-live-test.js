@@ -75,6 +75,12 @@
         skip: settings.capitalizeListItem ? null : 'Capitalize list items ist deaktiviert',
         actions: [text(prefix + 'hallo '), check(prefix + 'Hallo ')],
       })),
+      ...['\t', '    '].map((indent, index) => ({
+        id: 'mixed-nested-task-' + (index ? 'spaces' : 'tab'),
+        title: 'Aufgabe unter normalem Listenpunkt: ' + (index ? 'Leerzeichen' : 'Tab'),
+        actions: [setup('- Wort\n' + indent + '- [ ] '), text('WOrt '),
+          check('- Wort\n' + indent + '- [ ] Wort ')],
+      })),
       { id: 'parenthesized-abbreviation', title: 'Abkürzung in Klammern',
         skip: !settings.capitalizeSentences ? 'Capitalize sentences ist deaktiviert'
           : !(settings.abbreviations || []).some(word => word.toLowerCase() === 'i.e.') ? 'i.e. fehlt in der Abkürzungsliste' : null,

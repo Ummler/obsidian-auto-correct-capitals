@@ -17,6 +17,8 @@ npm run benchmark
   without a parent, Markdown correctly interprets those lines as code.
 - `input.test.cjs`: actual CodeMirror state transactions, ownership, cursor
   position, Enter, paste/completion/composition rejection and Unicode offsets.
+  Mixed nested tasks cover tabs/spaces, checked/unchecked markers and repeated
+  identical selections; actual cursor movements still cancel typed ownership.
 - `repetition.test.cjs`: deletion/retyping, temporary exceptions, shared word
   exclusions, policy changes and real CodeMirror undo/redo history.
 - `protection.test.cjs`: complete/unfinished and multiline targets, code/math,
@@ -49,7 +51,7 @@ background-parser timing. jsdom remains a development dependency.
 
 ## Current result
 
-2026-10-29, Node.js v22.23.1: **202 tests passed, 0 failed**. TypeScript and the
+2026-10-29, Node.js v22.23.1: **212 tests passed, 0 failed**. TypeScript and the
 production build pass. The original unfixed baseline was 25 passed / 26 failed;
 the preceding repair branch reached 74 passed / 0 failed before this feature.
 

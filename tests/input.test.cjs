@@ -7,6 +7,30 @@ const { CorrectionPolicy, DEFAULT_SETTINGS, correctionExtension, isProtected, ty
 
 const { editor } = require('./helpers/session.cjs');
 
+for (const indent of ['\t', '    ']) {
+  for (const marker of ['- [ ] ', '- [x] ', '+ [ ] ', '1) [ ] ']) {
+    test(`mixed nested task preserves ownership across identical cursor selection: ${JSON.stringify(indent + marker)}`, () => {
+      const prefix = '- Wort\n' + indent + marker;
+      const e = editor(prefix, { capitalizeListItem: true });
+      for (const char of 'WOrt') {
+        e.type(char);
+        // Reasserting the same selection is not a cursor movement.
+        e.apply({ selection: { anchor: e.state.selection.main.head } });
+      }
+      e.type(' ');
+      assert.equal(e.text(), prefix + 'Wort ');
+    });
+  }
+}
+test('moving away and back still cancels ownership in a nested task', () => {
+  const prefix = '- Wort\n\t- [ ] ';
+  const e = editor(prefix); e.type('WOrt');
+  const end = e.state.selection.main.head;
+  e.apply({ selection: { anchor: end - 1 } });
+  e.apply({ selection: { anchor: end } });
+  e.type(' '); assert.equal(e.text(), prefix + 'WOrt ');
+});
+
 test('only the word before the cursor changes', () => {
   const e = editor('Existing.  TEst ');
   e.apply({ selection: { anchor: 10 } }); e.type('HAllo ');

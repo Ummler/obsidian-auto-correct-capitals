@@ -188,6 +188,8 @@ für den nächsten Lauf; laufende Tests bleiben unverändert.
 - Isolierte Plugin-CPU-/Speichermessung oder ein Vergleich nach Deaktivierung
   aller übrigen Plugins.
 
+Gemischte verschachtelte Aufgabenlisten (`- Wort` mit untergeordnetem
+`- [ ] WOrt`) werden zusätzlich mit Tab und vier Leerzeichen geprüft.
 Die Fehlerfälle für Cursor und Enter bleiben unverändert als Abnahmekriterien erhalten.
 Der lokale Plugin-Code wurde korrigiert; ihre native Abnahme steht noch aus.
 

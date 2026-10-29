@@ -65,6 +65,16 @@ test('parser progress retries only the unchanged pending word and joins default 
     assert.equal(undo(view), true); assert.equal(view.state.doc.toString(), '');
   } finally { view.destroy(); }
 });
+test('identical selection updates preserve a pending correction', async () => {
+  let ready = false;
+  const { view, type } = make(correctionExtension(() => policy, () => ready ? 'clear' : 'pending'));
+  try {
+    type('WOrt ');
+    view.dispatch({ selection: { anchor: view.state.selection.main.head } });
+    ready = true; view.dispatch({}); await Promise.resolve();
+    assert.equal(view.state.doc.toString(), 'Wort ');
+  } finally { view.destroy(); }
+});
 for (const cancel of ['typing', 'selection', 'blur', 'protected', 'pause']) {
   test('deferred correction is cancelled safely by ' + cancel, async () => {
     let status = 'pending', active = policy;
