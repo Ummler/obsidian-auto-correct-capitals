@@ -1,13 +1,14 @@
 import { Annotation, EditorState, Extension, StateField, Transaction } from '@codemirror/state';
 import { CorrectionPolicy } from './settings';
 import { DELIMITER, LETTER, MAX_CONTEXT, replacementFor, WORD_CHAR } from './correction';
+import { blockContext } from './blocks';
 
 export const typedEnter = Annotation.define<boolean>();
 export const blockedInput = Annotation.define<boolean>();
 export const ownCorrection = Annotation.define<boolean>();
 interface Retry extends Run { original: string }
 const correctedWord = Annotation.define<Retry>();
-interface Run { from: number; to: number }
+interface Run { from: number; to: number; tail?: number }
 interface Decision { run?: Run; correction?: { from: number; to: number; insert: string } }
 
 function decide(tr: Transaction, run?: Run): Decision {
@@ -29,7 +30,7 @@ function decide(tr: Transaction, run?: Run): Decision {
   const char = points[0];
   if (!char) return {};
   if (WORD_CHAR.test(char)) {
-    if (run && run.to === change.from && change.end - run.from <= MAX_CONTEXT) {
+    if (run && !run.tail && run.to === change.from && change.end - run.from <= MAX_CONTEXT) {
       return { run: { from: run.from, to: change.end } };
     }
     // A new run must start at a word boundary, never in an existing word.
@@ -39,7 +40,12 @@ function decide(tr: Transaction, run?: Run): Decision {
       return { run: { from: change.from, to: change.end } };
     }
   }
-  if (run && run.to === change.from && DELIMITER.test(char)) {
+  // A dot or colon might still become an email address or URL. Wait for a
+  // definite boundary instead of changing the prefix of an unfinished token.
+  if (run && (run.tail || run.to) === change.from && /^[.,;:!?]$/.test(char)) {
+    return { run: { ...run, tail: change.end } };
+  }
+  if (run && (run.tail || run.to) === change.from && DELIMITER.test(char)) {
     return { correction: { from: run.from, to: run.to, insert: '' } };
   }
   return {};
@@ -75,7 +81,7 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
       return { run, retry, policy };
     },
   });
-  return [tracking, EditorState.transactionFilter.of(tr => {
+  return [blockContext, tracking, EditorState.transactionFilter.of(tr => {
     const previous = tr.startState.field(tracking);
     const policy = getPolicy();
     if (previous.policy !== policy) return tr;

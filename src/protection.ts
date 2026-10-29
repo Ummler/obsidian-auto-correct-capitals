@@ -1,50 +1,84 @@
 import { EditorState } from '@codemirror/state';
 import { syntaxTree, syntaxTreeAvailable } from '@codemirror/language';
 import { MAX_CONTEXT } from './correction';
+import { blockProtected } from './blocks';
 
-// Never force synchronous parsing on the input path. The caller only reaches
-// this function when a completed word would actually change.
+const protectedNode = (name: string): boolean =>
+  /code|math|frontmatter/i.test(name) || /^(URL|LinkTitle|LinkLabel|Autolink)$/.test(name);
+
+// This function never forces parsing or reads a prefix of the document.
 export function isProtected(state: EditorState, from: number, to: number): boolean {
-  if (!syntaxTreeAvailable(state, to)) return true;
+  if (blockProtected(state, from) || !syntaxTreeAvailable(state, to)) return true;
   const tree = syntaxTree(state);
   for (let node = tree.resolveInner(from, 1); node; node = node.parent!) {
-    if (/code|math|frontmatter|hmd-frontmatter/i.test(node.name)) return true;
+    if (protectedNode(node.name)) return true;
   }
-  let protectedNode = false;
+  let protectedChild = false;
   tree.iterate({ from, to, enter(node) {
-    if (/code|math|frontmatter/i.test(node.name)) protectedNode = true;
+    if (protectedNode(node.name)) protectedChild = true;
   } });
-  if (protectedNode) return true;
+  if (protectedChild) return true;
   const line = state.doc.lineAt(from);
+  // Skip pathological long lines rather than run unbounded regexes/scanners.
   if (line.length > MAX_CONTEXT) return true;
-  const text = line.text;
-  const pos = from - line.from;
-  // Syntax extensions differ between Obsidian and the standalone Markdown
-  // parser. Conservatively cover math and unfinished inline code locally.
-  let ticks = 0, dollars = 0;
-  for (let i = 0; i < pos; i++) {
-    if (text[i] === '\\') { i++; continue; }
-    if (text[i] === '`') ticks++;
-    if (text[i] === '$') dollars++;
+  return localProtected(line.text, from - line.from, to - line.from);
+}
+
+export function localProtected(text: string, from: number, to: number): boolean {
+  const overlaps = (a: number, b: number) => a < to && b > from;
+  // Protect completed and partially entered schemes and email addresses.
+  for (const pattern of [/\b(?:https?|mailto):[^\s<>"`]+|\b(?:https?|mailto):/gi,
+    /[^\s<>()[\]{}"'`]+@[^\s<>()[\]{}"'`]*/g]) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text))) {
+      if (overlaps(match.index, match.index + match[0].length)) return true;
+    }
   }
-  if (ticks % 2 || dollars % 2) return true;
-  const urls = /https?:[^\s<>"`]*/gi;
-  let match: RegExpExecArray | null;
-  while ((match = urls.exec(text))) {
-    if (match.index < to - line.from && match.index + match[0].length > pos) return true;
-  }
-  // Bounded fallback for YAML and math in parser configurations without those
-  // extensions. Unknown multiline context is skipped, not scanned unboundedly.
-  const header = state.doc.sliceString(0, Math.min(state.doc.length, MAX_CONTEXT));
-  if (from < MAX_CONTEXT) {
-    const mathMarkers = state.doc.sliceString(0, from).match(/^\$\$[\t ]*$/gm);
-    if (mathMarkers && mathMarkers.length % 2) return true;
-  }
-  if (/^---\r?\n/.test(header)) {
-    const end = /^---[\t ]*$/gm;
-    end.lastIndex = 4;
-    const close = end.exec(header);
-    if (!close || from <= close.index + close[0].length) return true;
+  // Reference definitions contain a destination and optional title.
+  const reference = /^[ \t]{0,3}\[[^\]]+\]:[ \t]*/.exec(text);
+  if (reference && overlaps(0, text.length)) return true;
+
+  let code = 0, math = false;
+  for (let i = 0; i < text.length;) {
+    if (text[i] === '\\') { i += 2; continue; }
+    if (text[i] === '`') {
+      let end = i + 1;
+      while (text[end] === '`') end++;
+      if (!code) code = end - i;
+      else if (code === end - i) code = 0;
+      i = end; continue;
+    }
+    if (code) { if (i >= from && i < to) return true; i++; continue; }
+    if (text[i] === '$') { math = !math; i++; continue; }
+    if (math && i >= from && i < to) return true;
+
+    if (text.slice(i, i + 2) === '[[') {
+      let end = i + 2, alias = -1;
+      while (end < text.length && text.slice(end, end + 2) !== ']]') {
+        if (text[end] === '\\') { end += 2; continue; }
+        if (text[end] === '|' && alias < 0) alias = end;
+        end++;
+      }
+      if (overlaps(i, alias < 0 ? end : alias)) return true;
+      i = Math.min(text.length, end + 2); continue;
+    }
+    if (text.slice(i, i + 2) === '](') {
+      let end = i + 2, depth = 1;
+      for (; end < text.length && depth; end++) {
+        if (text[end] === '\\') { end++; continue; }
+        if (text[end] === '(') depth++;
+        if (text[end] === ')') depth--;
+      }
+      if (overlaps(i + 2, end)) return true;
+      i = end; continue;
+    }
+    if (text.slice(i, i + 2) === '][') {
+      let end = i + 2;
+      while (end < text.length && text[end] !== ']') end++;
+      if (overlaps(i + 2, end)) return true;
+      i = end + 1; continue;
+    }
+    i++;
   }
   return false;
 }

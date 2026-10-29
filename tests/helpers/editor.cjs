@@ -3,9 +3,9 @@
 const { EditorState } = require('@codemirror/state');
 const { markdown } = require('@codemirror/lang-markdown');
 const { ensureSyntaxTree } = require('@codemirror/language');
-const { CorrectionPolicy, DEFAULT_SETTINGS, replacementFor, isProtected } = require('./runtime.cjs');
+const { CorrectionPolicy, DEFAULT_SETTINGS, replacementFor, isProtected, blockContext } = require('./runtime.cjs');
 function correct(text, settings = {}) {
-  const state = EditorState.create({ doc: text, extensions: [markdown()] });
+  const state = EditorState.create({ doc: text, extensions: [markdown(), blockContext] });
   ensureSyntaxTree(state, state.doc.length, 1000);
   const policy = new CorrectionPolicy({ ...DEFAULT_SETTINGS, ...settings });
   const words = /\p{L}[\p{L}\p{M}'’]*(?=[\s.,;:!?{}"')\]%])/gu;
