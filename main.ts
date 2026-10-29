@@ -38,6 +38,15 @@ class AutoCorrectSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'AutoCorrect Plugin Settings' });
 
     new Setting(containerEl)
+      .setName('Excluded folders')
+      .setDesc('One vault-relative folder per line. Subfolders are included. A note can also opt out with auto-correct-capitals: false in its frontmatter.')
+      .addTextArea(text => text.setValue(this.plugin.settings.excludedFolders.join('\n'))
+        .onChange(async value => {
+          this.plugin.settings.excludedFolders = value.split('\n').map(folder => folder.trim()).filter(Boolean);
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
       .setName('Respect repeated spelling')
       .setDesc('After a correction, keep an identical spelling retyped at the same location. Moving to another word clears this temporary exception.')
       .addToggle(toggle => toggle

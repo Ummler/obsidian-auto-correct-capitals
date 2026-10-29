@@ -2,6 +2,7 @@ import { Annotation, EditorState, Extension, StateField, Transaction } from '@co
 import { CorrectionPolicy } from './settings';
 import { DELIMITER, LETTER, MAX_CONTEXT, replacementFor, WORD_CHAR } from './correction';
 import { blockContext } from './blocks';
+import { headerPolicy } from './exclusions';
 
 export const typedEnter = Annotation.define<boolean>();
 export const blockedInput = Annotation.define<boolean>();
@@ -52,13 +53,30 @@ function decide(tr: Transaction, run?: Run): Decision {
 }
 
 export function correctionExtension(getPolicy: () => CorrectionPolicy,
-  protectedAt: (state: EditorState, from: number, to: number) => boolean): Extension {
+  protectedAt: (state: EditorState, from: number, to: number) => boolean,
+  getFilePath: (state: EditorState) => string | null = () => 'Note.md'): Extension {
+  const eligibility = StateField.define<{ path: string | null; policy: CorrectionPolicy; allowed: boolean }>({
+    create: state => {
+      const path = getFilePath(state), policy = getPolicy();
+      return { path, policy, allowed: path !== null && !policy.excludesPath(path) };
+    },
+    update: (old, tr) => {
+      const path = getFilePath(tr.startState), policy = getPolicy();
+      return path === old.path && policy === old.policy ? old
+        : { path, policy, allowed: path !== null && !policy.excludesPath(path) };
+    },
+  });
+  const enabled = (state: EditorState) => {
+    const file = state.field(eligibility);
+    return file.allowed && file.path === getFilePath(state) && file.policy === getPolicy() &&
+      !state.field(headerPolicy).disabled;
+  };
   interface Tracking { run?: Run; retry?: Retry; policy: CorrectionPolicy }
   const tracking = StateField.define<Tracking>({
     create: () => ({ policy: getPolicy() }),
     update: (old, tr) => {
       const policy = getPolicy();
-      if (old.policy !== policy) return { policy };
+      if (old.policy !== policy || !enabled(tr.startState)) return { policy };
       const record = tr.annotation(correctedWord);
       if (record) return { retry: record, policy };
       const run = decide(tr, old.run).run;
@@ -81,7 +99,8 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
       return { run, retry, policy };
     },
   });
-  return [blockContext, tracking, EditorState.transactionFilter.of(tr => {
+  return [blockContext, headerPolicy, eligibility, tracking, EditorState.transactionFilter.of(tr => {
+    if (!enabled(tr.startState)) return tr;
     const previous = tr.startState.field(tracking);
     const policy = getPolicy();
     if (previous.policy !== policy) return tr;

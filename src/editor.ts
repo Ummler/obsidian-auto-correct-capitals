@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import { blockedInput, correctionExtension, typedEnter } from './input';
 import { CorrectionPolicy } from './settings';
 import { isProtected } from './protection';
+import { editorInfoField } from 'obsidian';
 
 export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
   // Evidence belongs to a particular editor state and expires in this turn.
@@ -34,6 +35,7 @@ export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
       if (!intent) return tr;
       return [tr, { annotations: [typedEnter.of(!!intent.enter), blockedInput.of(!!intent.blocked)] }];
     })),
-    correctionExtension(getPolicy, isProtected),
+    correctionExtension(getPolicy, isProtected,
+      state => state.field(editorInfoField, false)?.file?.path || null),
   ];
 }

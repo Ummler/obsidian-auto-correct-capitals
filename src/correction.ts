@@ -6,7 +6,7 @@ export const WORD_CHAR = /^[\p{L}\p{M}'’]$/u;
 export const LETTER = /^\p{L}$/u;
 export const DELIMITER = /^[\s.,;:!?{}"')\]%]$/u;
 const DOUBLE_CAPITALS = /^(\p{Lu}\p{M}*)(\p{Lu}\p{M}*)(\p{Ll})/u;
-const LIST_PREFIX = /^[\t ]*(?:[-*+]|\d+\.)[\t ]+(?:\[[ xX]\][\t ]+)?$/;
+const LIST_PREFIX = /^[\t ]*(?:>[\t ]*)*(?:[-*+]|\d+[.)])[\t ]+(?:\[[ xX]\][\t ]+)?$/;
 
 export function replacementFor(state: EditorState, from: number, to: number,
   policy: CorrectionPolicy): string | null {

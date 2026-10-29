@@ -9,8 +9,15 @@ const result = buildSync({
   external: ['obsidian', '@codemirror/*', '@lezer/*'],
 });
 const compiled = { exports: {} };
+const runtimeRequire = createRequire(entry);
+const editorInfoField = runtimeRequire('@codemirror/state').StateField.define({
+  create: () => ({ file: { path: 'Note.md' } }), update: value => value,
+});
 vm.runInNewContext(result.outputFiles[0].text, {
-  module: compiled, exports: compiled.exports, require: createRequire(entry),
+  module: compiled, exports: compiled.exports,
+  require: id => id === 'obsidian' ? {
+    parseYaml: text => runtimeRequire('js-yaml').load(text), editorInfoField,
+  } : runtimeRequire(id),
   console, setTimeout, clearTimeout,
 });
 module.exports = compiled.exports;
