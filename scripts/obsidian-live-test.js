@@ -37,7 +37,8 @@
   function performanceActions(prefix, config, activeExpected) {
     const sample = 'HAllo '.repeat(config.performanceWords);
     const result = [setup(prefix, true),
-      { ...text(sample), measurement: 'active' }, check(activeExpected.repeat(config.performanceWords), 'Aktiv')];
+      { ...text(sample), measurement: config.pluginDisabled ? 'disabled' : 'active' },
+      check(config.pluginDisabled ? sample : activeExpected.repeat(config.performanceWords), config.pluginDisabled ? 'Plugin deaktiviert' : 'Aktiv')];
     const comparisonPrefix = prefix && !prefix.includes('\n') ? '\n' + prefix : '\n\n';
     if (config.comparePaused) result.push(paused(true), setup(comparisonPrefix, true),
       { ...text(sample), measurement: 'paused' }, check(sample, 'Pausierte Vergleichseingabe'), paused(false));
@@ -172,14 +173,14 @@
         actions: performanceActions('x'.repeat(2000) + ' ', config, 'Hallo ') },
       { id: 'perf-over-budget-line', title: 'Zeile über dem Kontextbudget: ' + config.longLineLength + ' Zeichen', performance: true,
         actions: performanceActions('x'.repeat(config.longLineLength) + ' ', config, 'HAllo ') },
-      { id: 'after-stress', title: 'Normale kurze Zeile nach den Lasttests', actions: [text('HAllo '), check('Hallo ')] },
+      { id: 'after-stress', title: 'Normale kurze Zeile nach den Lasttests', actions: [text('HAllo '), check(config.pluginDisabled ? 'HAllo ' : 'Hallo ')] },
     ] : [];
     return [...(config.includeFunctional ? functional : []), ...stress];
   }
 
   const defaults = { characterDelayMs: 130, settleMs: 500, casePauseMs: 900, startDelayMs: 5000,
     performanceDelayMs: 40, stressSettleMs: 1500, includeFunctional: true, includeStress: true,
-    comparePaused: true, stressParagraphs: 2000, stressBlocks: 300, longLineLength: 12000,
+    comparePaused: true, pluginDisabled: false, expectedEditorMode: null, stressParagraphs: 2000, stressBlocks: 300, longLineLength: 12000,
     performanceWords: 8, seed: 731 };
   function optionsFor(options = {}) {
     const merged = { ...defaults, ...options };
@@ -188,9 +189,11 @@
         throw new Error('Ungültige Zeitangabe: ' + name);
       }
     }
-    for (const name of ['includeFunctional', 'includeStress', 'comparePaused']) {
+    for (const name of ['includeFunctional', 'includeStress', 'comparePaused', 'pluginDisabled']) {
       if (typeof merged[name] !== 'boolean') throw new Error('Ungültige Option: ' + name);
     }
+    if (merged.pluginDisabled) { merged.includeFunctional = false; merged.comparePaused = false; }
+    if (![null, 'source', 'live-preview'].includes(merged.expectedEditorMode)) throw new Error('Ungültiger erwarteter Editormodus.');
     for (const [name, min, max] of [['stressParagraphs', 1, 20000], ['stressBlocks', 1, 3000],
       ['longLineLength', 4097, 200000], ['performanceWords', 1, 20], ['seed', 0, 0xffffffff]]) {
       if (!Number.isInteger(merged[name]) || merged[name] < min || merged[name] > max) throw new Error('Ungültige Option: ' + name);
@@ -219,6 +222,7 @@
   async function runSuite(host, settings, options, control) {
     const config = optionsFor(options);
     const results = control.results || (control.results = []);
+    let eventStart = 0;
     const guard = () => {
       if (control.stopped) throw new Error('Abgebrochen: ' + (control.reason || 'Stop angefordert'));
       host.assertActive();
@@ -226,6 +230,7 @@
     for (const item of cases(settings, config)) {
       guard();
       await host.beginCase(item);
+      eventStart = host.eventCursor ? host.eventCursor() : 0;
       guard();
       if (item.skip) {
         const result = { id: item.id, title: item.title, status: 'SKIP', reason: item.skip };
@@ -259,7 +264,10 @@
           const status = action.info ? 'INFO' : expected.includes(actual) ? 'PASS' : 'FAIL';
           // INFO is a checkpoint, never a substitute for the final assertion.
           const result = { id: item.id, title: item.title, checkpoint: action.label,
-            status, expected: action.expected, actual };
+            status, expected: action.expected, actual,
+            ...(host.context ? host.context() : {}),
+            eventStart, eventEnd: host.eventCursor ? host.eventCursor() : 0 };
+          eventStart = result.eventEnd;
           if (host.metrics) result.metrics = host.metrics();
           results.push(result);
           host.checkpoint(result);
@@ -282,16 +290,18 @@
     const contents = remote.getCurrentWebContents();
     if (typeof contents.sendInputEvent !== 'function') throw new Error('Electron sendInputEvent fehlt.');
     const plugin = app.plugins?.plugins?.['auto-correct-capitals'];
-    if (!plugin?.settings) throw new Error('Auto Correct Capitals ist nicht aktiviert.');
-    if (plugin.paused === true) throw new Error('Autokorrektur ist pausiert. Zuerst fortsetzen.');
-    const settings = JSON.parse(JSON.stringify(plugin.settings));
+    if (config.pluginDisabled ? !!plugin : !plugin?.settings) {
+      throw new Error(config.pluginDisabled ? 'Baseline benötigt ein vollständig deaktiviertes Plugin.' : 'Auto Correct Capitals ist nicht aktiviert.');
+    }
+    if (plugin?.paused === true) throw new Error('Autokorrektur ist pausiert. Zuerst fortsetzen.');
+    const settings = JSON.parse(JSON.stringify(plugin?.settings || {}));
     const events = [];
     const measurements = [], fixtures = [], frames = new Set();
     const now = () => root.performance.now();
     let pending, currentCase = '', phase = 'functional', droppedEvents = 0;
     let pauseTouched = false, lastPauseSet = false;
     let file, editor, view, start = 0, caseStart = 0, temporaryHeader = '', originalUpdate, wrappedUpdate, hadOwnUpdate;
-    let escapeHandler, inputHandler;
+    let escapeHandler, inputHandler, unsubscribeDiagnostics;
     const observedKinds = ['beforeinput', 'input', 'keydown', 'keyup', 'compositionstart', 'compositionend'];
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const notePath = 'AutoCorrect-Live-Test-' + stamp + '-' + Math.random().toString(36).slice(2, 7) + '.md';
@@ -313,7 +323,8 @@
         }
       },
       async prepare() {
-        const metadata = { pluginVersion: plugin.manifest?.version, settings, testOptions: config,
+        const metadata = { pluginVersion: plugin?.manifest?.version, pluginState: config.pluginDisabled ? 'disabled' : 'enabled',
+          correctionDiagnosticsAvailable: typeof plugin?.observeCorrections === 'function', settings, testOptions: config,
           transport: 'Electron sendInputEvent; DOM events and final CodeMirror transactions observed',
           userAgent: root.navigator.userAgent };
         // Hash files on disk, not a claim about an already cached plugin module.
@@ -344,7 +355,13 @@
         if (!view?.contentDOM) throw new Error('Kein CodeMirror-Editor. Testnotiz im Bearbeitungsmodus öffnen.');
         originalUpdate = view.update;
         control.metadata.editorMode = app.workspace.activeLeaf?.view?.getMode?.() || null;
-        control.metadata.editorClasses = view.dom?.closest('.markdown-source-view')?.className || null;
+        const sourceContainer = view.dom?.closest('.markdown-source-view');
+        control.metadata.editorClasses = sourceContainer?.className || null;
+        control.metadata.resolvedEditorMode = !sourceContainer ? null
+          : sourceContainer.classList.contains('is-live-preview') ? 'live-preview' : 'source';
+        if (config.expectedEditorMode && control.metadata.resolvedEditorMode !== config.expectedEditorMode) {
+          throw new Error('Editormodus stimmt nicht: erwartet ' + config.expectedEditorMode + ', erkannt ' + control.metadata.resolvedEditorMode);
+        }
         hadOwnUpdate = Object.prototype.hasOwnProperty.call(view, 'update');
         wrappedUpdate = function (transactions) {
           const observed = pending;
@@ -372,6 +389,9 @@
           return returned;
         };
         view.update = wrappedUpdate;
+        unsubscribeDiagnostics = plugin?.observeCorrections?.(event => {
+          if (app.workspace.getActiveFile()?.path === file.path) log({ kind: 'correction-decision', ...event });
+        });
         inputHandler = event => {
           if (pending && event.isTrusted && event.data === pending.character) {
             if (pending.inputAt === undefined) pending.inputAt = now();
@@ -433,6 +453,8 @@
         log({ kind: 'frontmatter-fixture', value });
       },
       phase(value) { pending = undefined; phase = value; },
+      context() { return { phase, time: Date.now() }; },
+      eventCursor() { return events.length; },
       async setup(action) {
         host.assertActive(); pending = undefined;
         const before = now(); append(action.value);
@@ -503,6 +525,7 @@
         console.log('AutoCorrect-Live-Test beendet', report);
       },
       cleanup() {
+        unsubscribeDiagnostics?.();
         for (const frame of frames) root.cancelAnimationFrame(frame);
         frames.clear();
         if (view?.update === wrappedUpdate) {

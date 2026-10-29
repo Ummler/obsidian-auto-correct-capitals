@@ -153,8 +153,7 @@ anderen Plugin-/Rendering-Aufwand. Zeitwerte sind informativ; `PASS` bewertet
 nur den erwarteten Text, nicht die Einhaltung eines Leistungsgrenzwertes.
 Wenige Stichproben, Instrumentierung, Parserzustand und Systemlast begrenzen die
 Aussagekraft. Für belastbare Vergleiche denselben Lauf mehrfach in Source und
-Live Preview wiederholen. Ein echter Vergleich ohne Plugin wäre ein separater
-kontrollierter Durchlauf.
+Live Preview wiederholen. Ein Vergleich ohne Plugin erfolgt mit dem unten beschriebenen Baseline-Modus.
 
 Nur Lasttests ausführen oder den Umfang anpassen:
 
@@ -189,9 +188,8 @@ für den nächsten Lauf; laufende Tests bleiben unverändert.
 - Isolierte Plugin-CPU-/Speichermessung oder ein Vergleich nach Deaktivierung
   aller übrigen Plugins.
 
-Die zwei bereits beobachteten Fehler (Cursor direkt vor einem bestehenden Wort
-und Enter) bleiben im Skript enthalten. Diese Erweiterung ändert den Plugin-Code
-nicht und setzt deren Ergebnis nicht künstlich auf PASS.
+Die Fehlerfälle für Cursor und Enter bleiben unverändert als Abnahmekriterien erhalten.
+Der lokale Plugin-Code wurde korrigiert; ihre native Abnahme steht noch aus.
 
 ## Kompakte Auswertung zum Kopieren
 
@@ -205,9 +203,68 @@ eval(require('fs').readFileSync('/home/ummel/Projects/obsidian-auto-correct-capi
 Das Skript liest die zugehörige strukturierte Diagnose und öffnet eine neue
 `…-Auswertung-….md`. Originalnotiz und JSON bleiben unverändert. Die neue Notiz
 enthält Gesamtzahlen, Einstellungen, fehlgeschlagene Prüfungen, Laufzeitwerte
-einschließlich Dokumentgrößen sowie maximal 32 Eingabeereignisse pro Fehlerfall.
+einschließlich Dokumentgrößen sowie bis zu 32 Eingabeereignisse und 16 zusätzliche Korrekturentscheidungen pro fehlgeschlagenem Prüfpunkt.
 Bestandene Testtexte, Fülltext und nicht zu Fehlern gehörende Rohereignisse
 entfallen. Laufzeitwerte bleiben auch bei bestandenem Texttest erhalten.
 
 Entwicklerkonsole schließen, in der neuen Notiz alles markieren und kopieren.
 Es wird nichts automatisch in die Zwischenablage oder ins Netzwerk geschrieben.
+
+## Neue Diagnose und erneute Abnahme
+
+Der aktuelle Build stellt `observeCorrections()` bereit. Der Treiber registriert
+sich nur für den Lauf und entfernt den Beobachter beim Aufräumen. Ohne Beobachter
+werden keine Diagnoseobjekte aufgebaut. Entscheidungen enthalten Positionen,
+Dokumentgröße und Gründe, keine Worttexte. Die Rohereignisse des Testtreibers
+enthalten weiterhin die Testeingaben.
+
+`syntax-pending` belegt fehlende Syntaxabdeckung. Das Plugin wartet ohne erzwungene
+Analyse oder Polling auf Parserfortschritt, höchstens 400 ms und nur solange Text,
+Auswahl, Datei und Einstellungen unverändert bleiben. `applied-after-parse` zeigt
+eine nachgeholte Korrektur; `pending-cancelled-edit` eine durch weitere Eingabe
+verworfene Vormerkung. Ein unbelegter Verdacht gilt damit nicht als behobener
+nativer Fehler. Zeitlich verzögerte Korrekturen behalten die ursprüngliche
+Eingabezeit für CodeMirrors Standard-Undo-Gruppierung; fremde History-Konfigurationen
+müssen separat geprüft werden.
+
+Prüfpunkte speichern Phase, Zeitpunkt und Ereignisintervall. Die kompakte
+Auswertung verwendet dieses Intervall, erhält Anfang und Ende und zusätzliche
+Korrekturentscheidungen. Bei älteren Diagnosen wird ein fehlgeschlagener
+`Aktiv`-Prüfpunkt gezielt der aktiven Phase zugeordnet.
+
+Nach Installation des neuen `main.js` und erneutem Laden des Plugins:
+
+1. Im echten Quellmodus den vollständigen Lauf ausführen:
+
+   ```js
+   window.AutoCorrectLiveTestOptions = { expectedEditorMode: 'source' };
+   eval(require('fs').readFileSync('/home/ummel/Projects/obsidian-auto-correct-capitals/scripts/obsidian-live-test.js', 'utf8'));
+   ```
+
+2. Live Preview einschalten und mit `expectedEditorMode: 'live-preview'` wiederholen.
+   Der Treiber bricht bei falschem Modus ab; Obsidian meldet beide Modi häufig
+   als `source`, deshalb wird zusätzlich die tatsächliche CSS-Klasse geprüft.
+3. Für den Leistungs-Vergleich pro Modus jeweils drei aktive und drei vollständig
+   deaktivierte Läufe abwechselnd durchführen. Gleiche Optionen, übrige Plugins
+   und Systemlast verwenden. Aktiv mit eingeschaltetem Plugin:
+
+   ```js
+   window.AutoCorrectLiveTestOptions = {
+     includeFunctional: false, comparePaused: false,
+     pluginDisabled: false, expectedEditorMode: 'source'
+   };
+   eval(require('fs').readFileSync('/home/ummel/Projects/obsidian-auto-correct-capitals/scripts/obsidian-live-test.js', 'utf8'));
+   ```
+
+4. Plugin in Obsidian vollständig deaktivieren. Danach dieselbe Ausführung mit
+   `pluginDisabled: true` starten. Der Treiber verweigert diesen Baseline-Modus,
+   solange die Plugin-Instanz geladen ist. Es werden nur Lastfälle ohne
+   Pause-Befehl ausgeführt; unkorrigierter Text wird ausdrücklich erwartet.
+   Für Live Preview jeweils `expectedEditorMode: 'live-preview'` setzen.
+5. Nach den Baseline-Läufen das Plugin wieder aktivieren. Der Treiber ändert den
+   Aktivierungszustand selbst nicht. Die JSON-Dateien behalten alle Einzelwerte,
+   Größen und fehlenden Messzuordnungen. Median/p95 und Wortabschlusszeiten nur
+   zwischen vergleichbaren Läufen bewerten, nicht aus `PASS` ableiten.
+
+Der Treiber läuft weiterhin ausschließlich lokal. Diese Dokumentation bestätigt
+keine bereits ausgeführte native Abnahme.

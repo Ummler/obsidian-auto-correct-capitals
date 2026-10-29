@@ -7,116 +7,115 @@
       "name": "small",
       "initialCharacters": 14,
       "baseline": {
-        "createMs": 0.435,
-        "letterP50Ms": 0.0514,
-        "letterP95Ms": 0.1074,
-        "boundaryP50Ms": 0.0514,
-        "boundaryP95Ms": 0.1021,
+        "createMs": 0.382,
+        "letterP50Ms": 0.05,
+        "letterP95Ms": 0.0922,
+        "boundaryP50Ms": 0.0515,
+        "boundaryP95Ms": 0.0895,
         "corrections": 0,
-        "parsePreparationMs": 0.121
+        "parsePreparationMs": 0.102
       },
       "plugin": {
-        "createMs": 0.426,
-        "letterP50Ms": 0.0518,
-        "letterP95Ms": 0.0779,
-        "boundaryP50Ms": 0.103,
-        "boundaryP95Ms": 0.1909,
+        "createMs": 0.343,
+        "letterP50Ms": 0.0558,
+        "letterP95Ms": 0.1001,
+        "boundaryP50Ms": 0.1118,
+        "boundaryP95Ms": 0.22,
         "corrections": 100,
-        "parsePreparationMs": 0.097
+        "parsePreparationMs": 0.123
       }
     },
     {
       "name": "10000-lines",
       "initialCharacters": 125000,
       "baseline": {
-        "createMs": 4.187,
-        "letterP50Ms": 2.3089,
-        "letterP95Ms": 3.7762,
-        "boundaryP50Ms": 2.283,
-        "boundaryP95Ms": 4.1489,
+        "createMs": 3.931,
+        "letterP50Ms": 2.2143,
+        "letterP95Ms": 3.5502,
+        "boundaryP50Ms": 2.2009,
+        "boundaryP95Ms": 3.8633,
         "corrections": 0,
-        "parsePreparationMs": 43.382
+        "parsePreparationMs": 43.23
       },
       "plugin": {
-        "createMs": 7.838,
-        "letterP50Ms": 2.4986,
-        "letterP95Ms": 4.9629,
-        "boundaryP50Ms": 2.8124,
-        "boundaryP95Ms": 5.1463,
+        "createMs": 9.127,
+        "letterP50Ms": 2.4558,
+        "letterP95Ms": 4.8982,
+        "boundaryP50Ms": 2.9153,
+        "boundaryP95Ms": 5.3086,
         "corrections": 100,
-        "parsePreparationMs": 14.156
+        "parsePreparationMs": 17.53
       }
     },
     {
       "name": "50000-lines",
       "initialCharacters": 625000,
       "baseline": {
-        "createMs": 7.708,
-        "letterP50Ms": 18.1859,
-        "letterP95Ms": 23.8692,
-        "boundaryP50Ms": 18.1559,
-        "boundaryP95Ms": 23.8517,
+        "createMs": 7.172,
+        "letterP50Ms": 16.9791,
+        "letterP95Ms": 21.8824,
+        "boundaryP50Ms": 17.0076,
+        "boundaryP95Ms": 21.8633,
         "corrections": 0,
-        "parsePreparationMs": 86.341
+        "parsePreparationMs": 84.154
       },
       "plugin": {
-        "createMs": 21.986,
-        "letterP50Ms": 18.1377,
-        "letterP95Ms": 22.9268,
-        "boundaryP50Ms": 18.3096,
-        "boundaryP95Ms": 21.7428,
+        "createMs": 21.19,
+        "letterP50Ms": 17.6804,
+        "letterP95Ms": 22.9682,
+        "boundaryP50Ms": 17.6013,
+        "boundaryP95Ms": 22.3181,
         "corrections": 100,
-        "parsePreparationMs": 78.413
+        "parsePreparationMs": 80.366
       }
     },
     {
       "name": "6000-math-delimiters",
       "initialCharacters": 27000,
       "baseline": {
-        "createMs": 2.879,
-        "letterP50Ms": 1.3069,
-        "letterP95Ms": 2.4421,
-        "boundaryP50Ms": 1.2693,
-        "boundaryP95Ms": 2.3906,
+        "createMs": 2.498,
+        "letterP50Ms": 1.2273,
+        "letterP95Ms": 2.3895,
+        "boundaryP50Ms": 1.2282,
+        "boundaryP95Ms": 2.395,
         "corrections": 0,
-        "parsePreparationMs": 9.472
+        "parsePreparationMs": 8.874
       },
       "plugin": {
-        "createMs": 11.931,
-        "letterP50Ms": 1.3156,
-        "letterP95Ms": 2.9866,
-        "boundaryP50Ms": 1.54,
-        "boundaryP95Ms": 3.3653,
+        "createMs": 14.773,
+        "letterP50Ms": 1.2913,
+        "letterP95Ms": 2.8619,
+        "boundaryP50Ms": 1.5547,
+        "boundaryP95Ms": 2.818,
         "corrections": 100,
-        "parsePreparationMs": 7.703
+        "parsePreparationMs": 7.753
       }
     },
     {
       "name": "100000-character-line",
       "initialCharacters": 100001,
       "baseline": {
-        "createMs": 5.585,
-        "letterP50Ms": 6.5489,
-        "letterP95Ms": 6.9794,
-        "boundaryP50Ms": 6.5665,
-        "boundaryP95Ms": 6.932,
+        "createMs": 5.718,
+        "letterP50Ms": 7.2694,
+        "letterP95Ms": 7.911,
+        "boundaryP50Ms": 7.2781,
+        "boundaryP95Ms": 7.8669,
         "corrections": 0,
-        "parsePreparationMs": 7.531
+        "parsePreparationMs": 7.39
       },
       "plugin": {
-        "createMs": 5.927,
-        "letterP50Ms": 6.5696,
-        "letterP95Ms": 6.8153,
-        "boundaryP50Ms": 6.601,
-        "boundaryP95Ms": 6.9199,
+        "createMs": 6.153,
+        "letterP50Ms": 7.2399,
+        "letterP95Ms": 7.5966,
+        "boundaryP50Ms": 7.2655,
+        "boundaryP95Ms": 7.54,
         "corrections": 0,
-        "parsePreparationMs": 7.676
+        "parsePreparationMs": 7.517
       }
     }
   ],
   "bundle": {
-    "bytes": 24371,
-    "gzipBytes": 6834
-  },
-  "date": "2026-10-29"
+    "bytes": 28932,
+    "gzipBytes": 7815
+  }
 }

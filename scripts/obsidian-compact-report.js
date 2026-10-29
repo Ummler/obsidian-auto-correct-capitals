@@ -26,7 +26,7 @@
     if (!failures.length) parts.push('Keine fehlgeschlagenen Prüfungen protokolliert.');
     for (const result of failures) {
       parts.push('### ' + result.id + ': ' + (result.title || ''), json({
-        checkpoint: result.checkpoint,
+        checkpoint: result.checkpoint, phase: result.phase,
         expected: bounded(result.expected), actual: bounded(result.actual), metrics: result.metrics,
       }));
     }
@@ -53,20 +53,31 @@
     }
 
     parts.push('## Ereignisausschnitte zu Fehlern');
-    const ids = [...new Set(failures.map(result => result.id))];
     const kinds = new Set(['beforeinput', 'input', 'keydown', 'keyup', 'compositionstart',
-      'compositionend', 'sent-char', 'sent-key', 'transaction']);
-    for (const id of ids) {
-      const events = (report.events || []).filter(event => event.case === id && kinds.has(event.kind) &&
+      'compositionend', 'sent-char', 'sent-key', 'transaction', 'correction-decision']);
+    for (const result of failures) {
+      const id = result.id;
+      // Older reports have no phase/window on checkpoints. Preserve active
+      // evidence for their active performance failures instead of paused tails.
+      const phase = result.phase || (id.startsWith('perf-') && result.checkpoint === 'Aktiv' ? 'active' : null);
+      let source = report.events || [];
+      if (Number.isInteger(result.eventStart) && Number.isInteger(result.eventEnd)) {
+        source = source.slice(result.eventStart, result.eventEnd);
+      }
+      const events = source.filter(event => event.case === id && (!phase || event.phase === phase) && kinds.has(event.kind) &&
         (event.kind !== 'transaction' || event.userEvent));
-      const tail = events.slice(-32).map(event => {
+      const boundary = events.length > 32 ? [...events.slice(0, 16), ...events.slice(-16)] : events;
+      const decisions = events.filter(event => event.kind === 'correction-decision' &&
+        event.reason !== 'no-owned-word').slice(0, 16);
+      const selected = events.filter(event => boundary.includes(event) || decisions.includes(event));
+      const tail = selected.map(event => {
         const entry = { ...event };
         if (entry.changes) entry.changes = entry.changes.map(change => ({
           ...change, inserted: bounded(change.inserted, 160),
         }));
         return entry;
       });
-      parts.push('### ' + id + ' — letzte ' + tail.length + ' von ' + events.length + ' Eingabeereignissen',
+      parts.push('### ' + id + ' / ' + (phase || result.checkpoint || 'unbekannte Phase') + ' — ' + tail.length + ' von ' + events.length + ' Eingabeereignissen (Anfang und Ende)',
         tail.length ? '```json\n' + tail.map(event => JSON.stringify(event)).join('\n') + '\n```'
           : 'Keine passenden Rohereignisse vorhanden.');
     }

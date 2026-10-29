@@ -47,6 +47,26 @@ test('live driver sends single characters and reports real failures without a pl
   assert.equal(results.find(result => result.id === 'unicode-sentence').status, 'SKIP');
   assert.equal(control.results, results);
 });
+test('disabled-plugin baseline omits functional/pause actions and expects unchanged text', async () => {
+  const config = { ...fast, pluginDisabled: true, includeStress: true, stressParagraphs: 1, stressBlocks: 1 };
+  const selected = cases({}, config);
+  assert.ok(selected.every(item => item.performance || item.id === 'after-stress'));
+  assert.ok(selected.every(item => item.actions.every(action => action.type !== 'pause')));
+  const h = host();
+  const results = await runSuite(h, {}, config, { results: [] });
+  assert.ok(results.length > 4);
+  assert.ok(results.every(result => result.status === 'PASS'));
+});
+test('checkpoint records phase and precise event boundaries', async () => {
+  const h = host(); let cursor = 0;
+  h.eventCursor = () => ++cursor;
+  h.context = () => ({ phase: 'functional', time: 42 });
+  const results = await runSuite(h, {}, fast, { results: [] });
+  const checks = results.filter(result => result.id === 'comma');
+  assert.equal(checks[0].phase, 'functional');
+  assert.equal(checks[0].time, 42);
+  assert.equal(checks[1].eventStart, checks[0].eventEnd);
+});
 test('live driver stops before another character after focus loss and retains results', async () => {
   const h = host(), control = { results: [] };
   let calls = 0;

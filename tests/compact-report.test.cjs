@@ -28,8 +28,27 @@ test('failure traces and unexpectedly huge actual text are explicitly bounded', 
     events: Array.from({ length: 1000 }, (_, i) => ({ case: 'bad', kind: 'input', data: 'e' + i })),
   }, 'source');
   assert.ok(result.includes('"truncated": true')); assert.ok(result.includes('32 von 1000'));
-  assert.ok(!result.includes('"data":"e1"')); assert.ok(result.includes('"data":"e999"'));
+  assert.ok(result.includes('"data":"e1"')); assert.ok(result.includes('"data":"e999"'));
+  assert.ok(!result.includes('"data":"e500"'));
   assert.ok(result.length < 10000);
+});
+test('active failure retains first active events and omits paused comparison events', () => {
+  const result = compactReport({ results: [{ id: 'perf-large', checkpoint: 'Aktiv', status: 'FAIL' }],
+    events: [{ case: 'perf-large', phase: 'active', kind: 'correction-decision', reason: 'syntax-pending' },
+      { case: 'perf-large', phase: 'paused', kind: 'input', data: 'PAUSED_NOISE' }] }, 'source');
+  assert.ok(result.includes('syntax-pending')); assert.ok(!result.includes('PAUSED_NOISE'));
+});
+test('failure checkpoint uses its exact recorded event interval', () => {
+  const result = compactReport({ results: [{ id: 'retry', status: 'FAIL', eventStart: 1, eventEnd: 2 }],
+    events: [{ case: 'retry', kind: 'input', data: 'earlier' }, { case: 'retry', kind: 'input', data: 'failed' },
+      { case: 'retry', kind: 'input', data: 'later' }] }, 'source');
+  assert.ok(result.includes('failed')); assert.ok(!result.includes('earlier')); assert.ok(!result.includes('later'));
+});
+test('first parser decision survives a long event trace', () => {
+  const events = Array.from({ length: 120 }, (_, i) => ({ case: 'bad', kind: 'input', data: String(i) }));
+  events[40] = { case: 'bad', kind: 'correction-decision', reason: 'syntax-pending' };
+  const result = compactReport({ results: [{ id: 'bad', status: 'FAIL' }], events }, 'source');
+  assert.ok(result.includes('syntax-pending'));
 });
 test('invalid diagnostics are rejected rather than reporting success', () => {
   assert.throws(() => compactReport({}, 'source'), /results fehlt/);

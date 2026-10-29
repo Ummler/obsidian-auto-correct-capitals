@@ -23,7 +23,7 @@ npm run benchmark
   large documents, syntax availability and incremental structural edits.
 - `exclusions.test.cjs`: quoted/task/numbered lists, folder boundaries, live
   frontmatter changes and cached file/header decisions.
-- `editor-events.test.cjs`: the actual registered event handlers, delayed DOM
+- `editor-events.test.cjs`: the actual registered event observers, delayed DOM
   input, plugin extension registration, pause command and settings migration.
 - `bundle.test.cjs`: CodeMirror and test dependencies remain external to the
   production bundle.
@@ -41,12 +41,15 @@ use the same class identity as production extensions.
 
 The test helper explicitly prepares a syntax tree to model an already-parsed
 editor viewport. Production never calls `ensureSyntaxTree` or `forceParsing`.
-Editor event tests invoke registered handlers against a state-backed view; they
-are not a browser/DOM or native Obsidian simulation.
+Editor event unit tests invoke registered observers against a state-backed view.
+`dom-input.test.cjs` additionally uses jsdom and a real EditorView with a consuming
+Enter keymap, pending parser outcomes, cancellation, destruction and default Undo.
+Its parser-status callback is controlled; it does not establish native Obsidian
+background-parser timing. jsdom remains a development dependency.
 
 ## Current result
 
-2026-10-29, Node.js v22.23.1: **185 tests passed, 0 failed**. TypeScript and the
+2026-10-29, Node.js v22.23.1: **202 tests passed, 0 failed**. TypeScript and the
 production build pass. The original unfixed baseline was 25 passed / 26 failed;
 the preceding repair branch reached 74 passed / 0 failed before this feature.
 
@@ -63,7 +66,7 @@ node --test tests/input.test.cjs tests/editor-events.test.cjs
 
 ## Acceptance boundaries
 
-Native desktop Source/Live Preview behavior, real DOM event ordering, IME,
+Native desktop Source/Live Preview behavior, Obsidian DOM event ordering, IME,
 mobile keyboards, the minimum Obsidian version, and repeated plugin unload/load
 still need separate validation. Follow [the native checklist](../docs/OBSIDIAN_ACCEPTANCE.md).
 Headless measurements and their limits are in [PERFORMANCE.md](../docs/PERFORMANCE.md).
