@@ -18,8 +18,8 @@
 
 5. Die Entwicklerwerkzeuge innerhalb von fünf Sekunden mit `Ctrl+Shift+I`
    schließen. Das Skript öffnet eine neue Notiz und tippt anschließend sichtbar.
-   Im Editor bleiben und nicht parallel tippen. Der Standardlauf dauert ungefähr
-   zwei Minuten. Zuerst im Quellmodus, danach separat in Live Preview testen.
+   Im Editor bleiben und nicht parallel tippen. Der erweiterte Standardlauf dauert ungefähr
+   vier bis sechs Minuten, abhängig von Einstellungen und Systemlast. Zuerst im Quellmodus, danach separat in Live Preview testen.
 
 Wenn der Flatpak-Dateizugriff den Dateipfad nicht zulässt, den vollständigen Inhalt
 von `scripts/obsidian-live-test.js` in die Entwicklerkonsole kopieren.
@@ -56,11 +56,12 @@ window.AutoCorrectLiveTestOptions = {
 Testtext wird über Electrons `webContents.sendInputEvent` als einzelne `char`-
 Ereignisse gesendet. Cursorbewegungen, Löschen und Enter verwenden echte
 Electron-Tastenereignisse. Es gibt keine direkten Editor-Ersetzungen oder
-erfundenen `input.type`-Annotationen für den Testtext. Nur Abschnittstitel und
-Ergebnisberichte werden programmgesteuert eingefügt.
+erfundenen `input.type`-Annotationen für den Testtext. Abschnittstitel, Ergebnisberichte und ausdrücklich als Fixture markierte
+Kontext-/Lasttexte werden programmgesteuert eingefügt. Die eigentlichen
+Prüfwörter kommen weiterhin ausschließlich über Electron-Zeichenereignisse.
 
-Der Test erfasst `beforeinput`/`input` mit `inputType`, `isTrusted` und
-`isComposing` sowie die tatsächlich angewendeten CodeMirror-Transaktionen mit
+Der Test erfasst `beforeinput`/`input` sowie Tastatur- und Kompositionsereignisse mit `inputType`, `isTrusted`,
+`isComposing` und Modifikatortasten sowie die tatsächlich angewendeten CodeMirror-Transaktionen mit
 ihrem `userEvent`. Eine vorübergehende Beobachtungsfunktion leitet `view.update`
 unverändert weiter und wird im `finally` wieder entfernt; DOM-Listener ebenso.
 
@@ -84,3 +85,110 @@ beeinflussen; deshalb bleiben die Rohereignisse für die Auswertung erhalten.
 
 Referenz: [Electron sendInputEvent](https://www.electronjs.org/docs/latest/api/web-contents#contentssendinputeventinputevent),
 [@electron/remote](https://github.com/electron/remote#remotegetcurrentwebcontents).
+
+## Zusätzliche Funktionsfälle
+
+- Fenced Code mit drei/vier Backticks, Sprachangabe und Tilden; Kontrolle sowohl
+  innerhalb als auch nach dem Block. Ein kürzerer Fence darf nicht schließen.
+- Einen Abschluss-Fence oberhalb des Cursors programmgesteuert entfernen und
+  wieder einsetzen, anschließend jeweils ein Wort tatsächlich tippen.
+- Display-Mathematik, eingerückter Code und Wortabschlüsse **innerhalb** offener
+  Inline-Code-/Mathematikbereiche. Nur vor dem Schließzeichen stehen zu bleiben
+  wäre kein aussagekräftiger Schutztest.
+- Unvollständiges Markdown-Ziel, Wikilink-Ziel und sichtbarer Alias.
+- Sichtbarer Markdown-Linktext, kyrillischer Satzanfang sowie längenändernde
+  Großschreibung (`ßeta` → `SSeta`) mit anschließender weiterer Eingabe.
+- Bereits eingefügtes Wort versus vollständig neu getipptes Wort.
+- Dritter Schreibversuch, gleicher Fehler an anderer Position und konfigurierte
+  Ausnahmen wie `PRs`/`MRs`, wenn deren Groß-/Kleinschreibung sonst geändert würde.
+- Pause/Fortsetzen sowie echte Undo-/Redo-Tastenkombinationen. Falls Undo auch
+  eine Testüberschrift entfernt, wird dies als fehlgeschlagene Testgrenze
+  ausgewiesen; Redo und die weiteren Tests werden trotzdem versucht.
+- In der **neu erstellten Testnotiz** temporär echte Frontmatter am Dateianfang
+  setzen: Boolean `false`, String `"false"`, Boolean `true`, anschließend entfernen.
+  Bei Abbruch kann die temporäre Frontmatter in dieser Testnotiz stehen bleiben.
+
+Der Pause-Befehl verändert nur den Sitzungszustand und wird nach dem Test,
+auch bei Abbruch, nach Möglichkeit wieder auf den anfänglichen aktiven Zustand
+zurückgesetzt. Einstellungen werden nicht dauerhaft geändert.
+
+## Lastaufbau und Laufzeitmessung
+
+Standardmäßig folgen nach den Funktionsfällen:
+
+1. Referenzmessung vor dem Lastaufbau.
+2. 2.000 reproduzierbar erzeugte Markdown-Abschnitte (Seed 731: rund 222.000
+   UTF-16-Zeichen, 8.300 Zeilen), gemischt aus Fließtext, Überschriften, Listen,
+   Zitaten, Links sowie korrekt geschlossenen Code- und Mathematikblöcken.
+3. 300 zusätzliche geschlossene Codeblöcke.
+4. Eine Zeile mit 2.000 Zeichen, in der Korrektur weiterhin erwartet wird.
+5. Eine Zeile mit 12.000 Zeichen. Hier muss das Plugin wegen seines dokumentierten
+   4.096-Zeichen-Budgets die Korrektur auslassen. Das ist kein Korrekturfehler.
+6. Eine kurze Zeile danach, in der die Korrektur wieder funktionieren muss.
+
+Große Fixtures werden einmal eingefügt. Die Zeit dafür steht separat unter
+`fixtures[].synchronousInsertMs`; sie schließt nicht die gesamte spätere
+Hintergrundanalyse ein. Danach wird gewartet und pro Messphase werden acht
+Prüfwörter mit 40 ms Abstand pro Zeichen getippt. Damit wird das Verhalten in
+einem großen Dokument untersucht, ohne minutenlang Fülltext einzutippen.
+
+Die Messungen erscheinen an den Prüfpunkten sowie in der JSON-Datei:
+
+- `sendToApplied`: Electron-Sendezeitpunkt bis zur ersten passenden angewendeten
+  Eingabetransaktion, mit Median, p95 und Maximum.
+- `wordBoundaryToApplied`: dieselbe Messung nur für Wortabschluss-Leerstellen.
+- `sendToNextFrame`: Zeit bis zur nächsten beobachteten `requestAnimationFrame`-
+  Gelegenheit. Das beweist keinen physischen Bildschirm-Paint.
+- `synchronousViewUpdate`: beobachtete Dauer von `view.update`; die vorherige
+  Transaktionskonstruktion/Filterung ist darin nicht vollständig enthalten.
+- `withoutMatchedTransaction`: gesendete Zeichen ohne passende beobachtete
+  Transaktion. Dafür werden keine Latenzwerte erfunden.
+- `measurements`: Einzelwerte mit Fall, Phase und tatsächlicher Dokumentgröße.
+
+Aktive und pausierte Phasen werden getrennt erfasst. Bei langen Zeilen beginnt
+auch die pausierte Vergleichsphase auf einer entsprechend langen Zeile.
+**Pausiert ist nicht deinstalliert:** Die Zustandsfelder des Plugins bleiben
+registriert. Der Vergleich isoliert weder die gesamte Plugin-CPU-Zeit noch
+anderen Plugin-/Rendering-Aufwand. Zeitwerte sind informativ; `PASS` bewertet
+nur den erwarteten Text, nicht die Einhaltung eines Leistungsgrenzwertes.
+Wenige Stichproben, Instrumentierung, Parserzustand und Systemlast begrenzen die
+Aussagekraft. Für belastbare Vergleiche denselben Lauf mehrfach in Source und
+Live Preview wiederholen. Ein echter Vergleich ohne Plugin wäre ein separater
+kontrollierter Durchlauf.
+
+Nur Lasttests ausführen oder den Umfang anpassen:
+
+```js
+window.AutoCorrectLiveTestOptions = {
+  includeFunctional: false,
+  includeStress: true,
+  comparePaused: true,
+  stressParagraphs: 2000,
+  stressBlocks: 300,
+  longLineLength: 12000,
+  performanceWords: 8,
+  performanceDelayMs: 40,
+  stressSettleMs: 1500,
+  seed: 731
+};
+```
+
+Nur Funktionsfälle: `window.AutoCorrectLiveTestOptions = { includeStress: false };`
+Danach jeweils denselben Startbefehl wie oben ausführen. Neue Optionswerte gelten
+für den nächsten Lauf; laufende Tests bleiben unverändert.
+
+## Weiterhin nicht durch diesen Lauf abgedeckt
+
+- Echte Zwischenablage/Paste, Drag-and-drop und jede konkrete Template- oder
+  Completion-Erweiterung. Programmgesteuerte Fixtures sind kein Ersatz dafür.
+- Physische Tastatur, reale IME, mobile Tastaturen, Diktat und Wischschreiben.
+- Ordnerausschlüsse, Dateiumbenennung und mehrere gleichzeitig geöffnete Editor-
+  Ansichten. Der Lauf bleibt absichtlich in genau seiner neuen Testnotiz.
+- Fehlerhafte/übermäßig große YAML-Header sowie beliebige Markdown-Randfälle.
+- Wiederholtes echtes Entladen/Laden des Plugins und die Mindestversion 1.5.7.
+- Isolierte Plugin-CPU-/Speichermessung oder ein Vergleich nach Deaktivierung
+  aller übrigen Plugins.
+
+Die zwei bereits beobachteten Fehler (Cursor direkt vor einem bestehenden Wort
+und Enter) bleiben im Skript enthalten. Diese Erweiterung ändert den Plugin-Code
+nicht und setzt deren Ergebnis nicht künstlich auf PASS.
