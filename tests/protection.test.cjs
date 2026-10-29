@@ -71,3 +71,25 @@ test('frontmatter close and math inside fenced code do not leak', () => {
   ensureSyntaxTree(state, doc.length, 1000);
   assert.equal(isProtected(state, doc.length - 5, doc.length), false);
 });
+for (const prefix of ['[text](\n', '[text](path "title\n', '[[Note\n']) {
+  test(`unfinished multiline link context is protected: ${prefix}`, () => {
+    const e = editor(prefix); e.type('HAllo '); assert.equal(e.text(), prefix + 'HAllo ');
+  });
+}
+test('reference definition does not protect following ordinary paragraph', () => {
+  const e = editor('[id]: destination\n\n'); e.type('HAllo ');
+  assert.equal(e.text(), '[id]: destination\n\nHallo ');
+});
+test('incremental block metadata agrees with a fresh document after structural edits', () => {
+  let state = EditorState.create({ doc: '---\ntitle: x\n---\n$$\nx\n$$\n```\ny\n```\n', extensions: [blockContext] });
+  let seed = 731;
+  const random = max => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % max; };
+  const chunks = ['x', '\n', '$$', '```', '---', '>', ' ', '~~~'];
+  for (let i = 0; i < 250; i++) {
+    const from = random(state.doc.length + 1);
+    const to = Math.min(state.doc.length, from + random(5));
+    state = state.update({ changes: { from, to, insert: chunks[random(chunks.length)] } }).state;
+    const fresh = EditorState.create({ doc: state.doc.toString(), extensions: [blockContext] });
+    assert.equal(JSON.stringify(state.field(blockContext)), JSON.stringify(fresh.field(blockContext)), `edit ${i}`);
+  }
+});

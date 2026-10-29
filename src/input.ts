@@ -27,6 +27,7 @@ function decide(tr: Transaction, run?: Run): Decision {
   if (changes.length !== 1) return {};
   const change = changes[0];
   if (change.from !== change.to || change.from !== tr.startState.selection.main.head) return {};
+  if (enter && !change.text.startsWith('\n')) return {};
   const points = Array.from(change.text);
   if (!enter && points.length !== 1) return {};
   const char = points[0];
@@ -38,7 +39,8 @@ function decide(tr: Transaction, run?: Run): Decision {
     // A new run must start at a word boundary, never in an existing word.
     const previous = tr.startState.doc.sliceString(Math.max(0, change.from - 2), change.from);
     const last = Array.from(previous).pop();
-    if (LETTER.test(char) && !(last && WORD_CHAR.test(last))) {
+    const next = Array.from(tr.startState.doc.sliceString(change.from, change.from + 2))[0];
+    if (LETTER.test(char) && !(last && WORD_CHAR.test(last)) && !(next && WORD_CHAR.test(next))) {
       return { run: { from: change.from, to: change.end } };
     }
   }

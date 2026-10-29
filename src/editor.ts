@@ -6,24 +6,29 @@ import { isProtected } from './protection';
 import { editorInfoField } from 'obsidian';
 
 export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
-  // Evidence belongs to a particular editor state and expires in this turn.
+  // Evidence belongs to a particular state, and is consumed by its next edit.
+  // Do not expire at a microtask: DOMObserver may flush after beforeinput.
   const evidence = new WeakMap<EditorState, { enter?: boolean; blocked?: boolean }>();
   const remember = (view: EditorView, value: { enter?: boolean; blocked?: boolean }) => {
     const state = view.state;
     evidence.set(state, value);
-    Promise.resolve().then(() => evidence.delete(state));
   };
   return [
     EditorView.domEventHandlers({
       keydown(event, view) {
         if (event.key === 'Enter' && !event.isComposing) remember(view, { enter: true });
+        else evidence.delete(view.state);
+        return false;
+      },
+      keyup(event, view) {
+        if (event.key === 'Enter') evidence.delete(view.state);
         return false;
       },
       beforeinput(event, view) {
         const input = event as InputEvent;
         if (input.isComposing || !['insertText', 'insertParagraph', 'insertLineBreak'].includes(input.inputType)) {
           remember(view, { blocked: true });
-        }
+        } else if (input.inputType === 'insertText') evidence.delete(view.state);
         return false;
       },
       paste(_event, view) { remember(view, { blocked: true }); return false; },
@@ -43,6 +48,7 @@ export function editorExtension(getPolicy: () => CorrectionPolicy): Extension {
     Prec.lowest(EditorState.transactionFilter.of(tr => {
       const intent = evidence.get(tr.startState);
       if (!intent) return tr;
+      if (tr.docChanged) evidence.delete(tr.startState);
       return [tr, { annotations: [typedEnter.of(!!intent.enter), blockedInput.of(!!intent.blocked)] }];
     })),
     correctionExtension(getPolicy, isProtected,

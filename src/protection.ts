@@ -21,22 +21,36 @@ export function isProtected(state: EditorState, from: number, to: number): boole
   const line = state.doc.lineAt(from);
   // Skip pathological long lines rather than run unbounded regexes/scanners.
   if (line.length > MAX_CONTEXT) return true;
-  return localProtected(line.text, from - line.from, to - line.from);
+  // Include a bounded lookbehind for unfinished multiline link destinations
+  // and titles. Never copy the document prefix or an unbounded paragraph.
+  let contextStart = Math.max(0, line.to - MAX_CONTEXT);
+  let text = state.doc.sliceString(contextStart, line.to);
+  const paragraphBreak = text.lastIndexOf('\n\n', from - contextStart);
+  if (paragraphBreak >= 0) {
+    contextStart += paragraphBreak + 2;
+    text = text.slice(paragraphBreak + 2);
+  }
+  return localProtected(text, from - contextStart, to - contextStart);
 }
 
 export function localProtected(text: string, from: number, to: number): boolean {
   const overlaps = (a: number, b: number) => a < to && b > from;
   // Protect completed and partially entered schemes and email addresses.
-  for (const pattern of [/\b(?:https?|mailto):[^\s<>"`]+|\b(?:https?|mailto):/gi,
-    /[^\s<>()[\]{}"'`]+@[^\s<>()[\]{}"'`]*/g]) {
+  for (const pattern of [/\b(?:https?|mailto):[^\s<>"`]*/gi,
+    /[^\s<>()[\]{}"'`]+/g]) {
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(text))) {
-      if (overlaps(match.index, match.index + match[0].length)) return true;
+      if ((match[0].includes('@') || /^(?:https?|mailto):/i.test(match[0])) &&
+        overlaps(match.index, match.index + match[0].length)) return true;
     }
   }
   // Reference definitions contain a destination and optional title.
-  const reference = /^[ \t]{0,3}\[[^\]]+\]:[ \t]*/.exec(text);
-  if (reference && overlaps(0, text.length)) return true;
+  const references = /(?:^|\n)[ \t]{0,3}\[[^\]\n]+\]:[ \t]*/g;
+  let reference: RegExpExecArray | null;
+  while ((reference = references.exec(text))) {
+    const end = text.indexOf('\n', references.lastIndex);
+    if (overlaps(reference.index, end < 0 ? text.length : end)) return true;
+  }
 
   let code = 0, math = false;
   for (let i = 0; i < text.length;) {

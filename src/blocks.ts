@@ -12,8 +12,10 @@ const markerText = (text: string): string => {
 
 function markersIn(doc: Text, first: number, last: number): Marker[] {
   const result: Marker[] = [];
+  const lines = doc.iterLines(first, last + 1);
   for (let line = first; line <= last; line++) {
-    const raw = markerText(doc.line(line).text);
+    lines.next();
+    const raw = markerText(lines.value);
     if (raw) result.push({ line, raw, after: EMPTY });
   }
   return result;

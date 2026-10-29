@@ -54,12 +54,19 @@ test('composition start clears typed ownership', () => {
   const e = make(); e.type('HAllo'); e.handlers.compositionstart({}, e.view); e.type(' ');
   assert.equal(e.text(), 'HAllo ');
 });
-test('Enter evidence expires without a corresponding transaction', async () => {
+test('Enter evidence expires on keyup without a corresponding transaction', () => {
   const e = make(); e.type('HAllo');
   e.handlers.keydown({ key: 'Enter', isComposing: false }, e.view);
-  await Promise.resolve();
+  e.handlers.keyup({ key: 'Enter' }, e.view);
   e.view.dispatch({ changes: { from: 5, insert: '\n' }, userEvent: 'input' });
   assert.equal(e.text(), 'HAllo\n');
+});
+test('replacement evidence survives the beforeinput-to-DOMObserver microtask gap', async () => {
+  const e = make();
+  e.handlers.beforeinput({ inputType: 'insertReplacementText', isComposing: false }, e.view);
+  await Promise.resolve();
+  e.view.dispatch({ changes: { from: 0, insert: 'H' }, selection: { anchor: 1 }, userEvent: 'input.type' });
+  e.type('Allo '); assert.equal(e.text(), 'HAllo ');
 });
 test('plugin registers editor-owned hooks and session-only pause command', async () => {
   const plugin = new AutoCorrectPlugin(); await plugin.onload();
@@ -68,6 +75,20 @@ test('plugin registers editor-owned hooks and session-only pause command', async
   plugin.commands[0].callback(); assert.equal(plugin.statusText, 'AutoCorrect: paused');
   await plugin.saveSettings(); assert.equal('paused' in plugin.saved, false);
   plugin.commands[0].callback(); assert.equal(plugin.statusText, 'AutoCorrect: on');
+});
+test('pause command gates the actual extension registered by the plugin', async () => {
+  const plugin = new AutoCorrectPlugin(); await plugin.onload();
+  let state = EditorState.create({ extensions: [markdown(), testEditorInfoField, plugin.extensions] });
+  const type = text => {
+    for (const char of text) {
+      ensureSyntaxTree(state, state.doc.length, 1000);
+      const pos = state.selection.main.head;
+      state = state.update({ changes: { from: pos, insert: char }, selection: { anchor: pos + char.length }, userEvent: 'input.type' }).state;
+    }
+  };
+  plugin.commands[0].callback(); type('HAllo ');
+  plugin.commands[0].callback(); type('HAllo ');
+  assert.equal(state.doc.toString(), 'HAllo Hallo ');
 });
 test('settings migration validates types and keeps old options', () => {
   const settings = loadSettings({ capitalizeListItem: true, exclusionList: [' NB ', 42],

@@ -71,3 +71,22 @@ test('tab-indented code is not a nested list without a parent', () => {
   const e = editor('\t1. ', { capitalizeListItem: true }); e.type('hallo ');
   assert.equal(e.text(), '\t1. hallo ');
 });
+test('inserting at the start of an existing word does not claim its ownership', () => {
+  const e = editor('world'); e.apply({ selection: { anchor: 0 } });
+  e.type('HAllo '); assert.equal(e.text(), 'HAllo world');
+});
+test('single-character paste does not make the rest of the word eligible', () => {
+  const e = editor();
+  e.apply({ changes: { from: 0, insert: 'H' }, selection: { anchor: 1 }, userEvent: 'input.paste' });
+  e.type('Allo '); assert.equal(e.text(), 'HAllo ');
+});
+test('Unicode casing expansion keeps the cursor and subsequent words correct', () => {
+  const e = editor('', { capitalizeSentences: true }); e.type('ßeta next ');
+  assert.equal(e.text(), 'SSeta next ');
+  assert.equal(e.state.selection.main.head, e.state.doc.length);
+});
+test('astral letters are entered and corrected without splitting code points', () => {
+  const e = editor('', { capitalizeSentences: true }); e.type('𐐨word ');
+  assert.equal(e.text(), '𐐀word ');
+  assert.equal(e.state.selection.main.head, e.state.doc.length);
+});

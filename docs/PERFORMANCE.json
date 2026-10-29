@@ -1,0 +1,122 @@
+{
+  "node": "v22.23.1",
+  "platform": "linux",
+  "method": "headless CodeMirror transactions; warm parsed viewport; no DOM/rendering; 500 letter and 100 boundary samples per case",
+  "scenarios": [
+    {
+      "name": "small",
+      "initialCharacters": 14,
+      "baseline": {
+        "createMs": 0.435,
+        "letterP50Ms": 0.0514,
+        "letterP95Ms": 0.1074,
+        "boundaryP50Ms": 0.0514,
+        "boundaryP95Ms": 0.1021,
+        "corrections": 0,
+        "parsePreparationMs": 0.121
+      },
+      "plugin": {
+        "createMs": 0.426,
+        "letterP50Ms": 0.0518,
+        "letterP95Ms": 0.0779,
+        "boundaryP50Ms": 0.103,
+        "boundaryP95Ms": 0.1909,
+        "corrections": 100,
+        "parsePreparationMs": 0.097
+      }
+    },
+    {
+      "name": "10000-lines",
+      "initialCharacters": 125000,
+      "baseline": {
+        "createMs": 4.187,
+        "letterP50Ms": 2.3089,
+        "letterP95Ms": 3.7762,
+        "boundaryP50Ms": 2.283,
+        "boundaryP95Ms": 4.1489,
+        "corrections": 0,
+        "parsePreparationMs": 43.382
+      },
+      "plugin": {
+        "createMs": 7.838,
+        "letterP50Ms": 2.4986,
+        "letterP95Ms": 4.9629,
+        "boundaryP50Ms": 2.8124,
+        "boundaryP95Ms": 5.1463,
+        "corrections": 100,
+        "parsePreparationMs": 14.156
+      }
+    },
+    {
+      "name": "50000-lines",
+      "initialCharacters": 625000,
+      "baseline": {
+        "createMs": 7.708,
+        "letterP50Ms": 18.1859,
+        "letterP95Ms": 23.8692,
+        "boundaryP50Ms": 18.1559,
+        "boundaryP95Ms": 23.8517,
+        "corrections": 0,
+        "parsePreparationMs": 86.341
+      },
+      "plugin": {
+        "createMs": 21.986,
+        "letterP50Ms": 18.1377,
+        "letterP95Ms": 22.9268,
+        "boundaryP50Ms": 18.3096,
+        "boundaryP95Ms": 21.7428,
+        "corrections": 100,
+        "parsePreparationMs": 78.413
+      }
+    },
+    {
+      "name": "6000-math-delimiters",
+      "initialCharacters": 27000,
+      "baseline": {
+        "createMs": 2.879,
+        "letterP50Ms": 1.3069,
+        "letterP95Ms": 2.4421,
+        "boundaryP50Ms": 1.2693,
+        "boundaryP95Ms": 2.3906,
+        "corrections": 0,
+        "parsePreparationMs": 9.472
+      },
+      "plugin": {
+        "createMs": 11.931,
+        "letterP50Ms": 1.3156,
+        "letterP95Ms": 2.9866,
+        "boundaryP50Ms": 1.54,
+        "boundaryP95Ms": 3.3653,
+        "corrections": 100,
+        "parsePreparationMs": 7.703
+      }
+    },
+    {
+      "name": "100000-character-line",
+      "initialCharacters": 100001,
+      "baseline": {
+        "createMs": 5.585,
+        "letterP50Ms": 6.5489,
+        "letterP95Ms": 6.9794,
+        "boundaryP50Ms": 6.5665,
+        "boundaryP95Ms": 6.932,
+        "corrections": 0,
+        "parsePreparationMs": 7.531
+      },
+      "plugin": {
+        "createMs": 5.927,
+        "letterP50Ms": 6.5696,
+        "letterP95Ms": 6.8153,
+        "boundaryP50Ms": 6.601,
+        "boundaryP95Ms": 6.9199,
+        "corrections": 0,
+        "parsePreparationMs": 7.676
+      }
+    }
+  ],
+  "bundle": {
+    "bytes": 24371,
+    "gzipBytes": 6834
+  },
+  "date": "2026-10-29"
+}

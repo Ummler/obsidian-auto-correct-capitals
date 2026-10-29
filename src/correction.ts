@@ -10,6 +10,7 @@ const LIST_PREFIX = /^[\t ]*(?:>[\t ]*)*(?:[-*+]|\d+[.)])[\t ]+(?:\[[ xX]\][\t ]
 
 export function replacementFor(state: EditorState, from: number, to: number,
   policy: CorrectionPolicy): string | null {
+  if (to - from > MAX_CONTEXT) return null;
   const word = state.doc.sliceString(from, to);
   if (!word || policy.exclusions.has(normalizeWord(word))) return null;
   const line = state.doc.lineAt(from);
