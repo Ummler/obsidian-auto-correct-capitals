@@ -2,6 +2,42 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { undo, redo } = require('@codemirror/commands');
 const { editor } = require('./helpers/session.cjs');
+const { deleteCharBackward, deleteGroupBackward } = require('@codemirror/commands');
+const { blockedInput } = require('./helpers/runtime.cjs');
+
+function backspace(e) { deleteCharBackward({ state: e.state, dispatch: e.apply }); }
+test('backspace while composing a word preserves its first correction', () => {
+  const e = editor(); e.type('ABcdf'); backspace(e); e.type('ef ');
+  assert.equal(e.text(), 'Abcdef ');
+});
+test('DOM deletion evidence does not discard an owned word', () => {
+  const e = editor(); e.type('ABcdf');
+  e.apply({ changes: { from: 4, to: 5 }, selection: { anchor: 4 },
+    userEvent: 'delete.backward', annotations: blockedInput.of(true) });
+  e.type('ef '); assert.equal(e.text(), 'Abcdef ');
+});
+test('deleting deferred punctuation allows continued typing', () => {
+  const e = editor(); e.type('ABcd,'); backspace(e); e.type('ef ');
+  assert.equal(e.text(), 'Abcdef ');
+});
+test('editing a pre-existing word does not acquire typed ownership', () => {
+  const e = editor('ABcdf'); backspace(e); e.type('ef ');
+  assert.equal(e.text(), 'ABcdef ');
+});
+for (const method of ['characters', 'word', 'selection', 'cut']) {
+  test(`actual correction followed by ${method} deletion preserves deliberate spelling`, () => {
+    const e = editor(); e.type('ABcdef '); assert.equal(e.text(), 'Abcdef ');
+    if (method === 'characters') while (e.state.doc.length) backspace(e);
+    if (method === 'word') while (e.state.doc.length) deleteGroupBackward({ state: e.state, dispatch: e.apply });
+    if (method === 'selection' || method === 'cut') {
+      e.apply({ selection: { anchor: 0, head: e.state.doc.length } });
+      if (method === 'selection') backspace(e);
+      else e.apply({ changes: { from: 0, to: e.state.doc.length }, selection: { anchor: 0 },
+        userEvent: 'delete.cut', annotations: blockedInput.of(true) });
+    }
+    e.type('ABcdef '); assert.equal(e.text(), 'ABcdef ');
+  });
+}
 
 function erase(e) {
   e.apply({ changes: { from: 0, to: e.state.doc.length }, selection: { anchor: 0 }, userEvent: 'delete.backward' });
