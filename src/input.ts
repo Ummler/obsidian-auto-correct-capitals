@@ -15,11 +15,31 @@ const correctedWord = Annotation.define<Retry>();
 interface Run { from: number; to: number; tail?: number }
 interface Decision { run?: Run; correction?: { from: number; to: number; insert: string } }
 
+function isUserDeletion(tr: Transaction): boolean {
+  if (!tr.docChanged || !/^delete(?:\.|$)/.test(tr.annotation(Transaction.userEvent) || '')) return false;
+  let pure = true;
+  tr.changes.iterChanges((_from, _to, _a, _b, inserted) => { if (inserted.length) pure = false; });
+  return pure;
+}
+
 function decide(tr: Transaction, run?: Run): Decision {
   if (!tr.docChanged) {
     // Widget/view updates may reassert the current selection. Only an actual
     // selection change relinquishes ownership of the word being typed.
     return { run: tr.selection && !tr.newSelection.eq(tr.startState.selection) ? undefined : run };
+  }
+  // Deletion never claims existing text. A backspace at the end of an owned
+  // span only shortens that span, allowing the next typed letter to extend it.
+  if (run && isUserDeletion(tr) && tr.startState.selection.ranges.length === 1 &&
+    tr.startState.selection.main.empty && tr.newSelection.ranges.length === 1 && tr.newSelection.main.empty) {
+    let count = 0, from = 0, to = 0;
+    tr.changes.iterChanges((a, b) => { count++; from = a; to = b; });
+    if (count === 1 && from >= run.from && to === (run.tail || run.to) &&
+      to === tr.startState.selection.main.head && tr.newSelection.main.head === from) {
+      const end = Math.min(run.to, from);
+      return { run: end > run.from ? { from: run.from, to: end,
+        tail: from > end ? from : undefined } : undefined };
+    }
   }
   if (tr.annotation(blockedInput) || tr.startState.selection.ranges.length !== 1 ||
     !tr.startState.selection.main.empty) return {};
@@ -99,7 +119,8 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
       if (!policy.settings.respectRepeatedSpelling) retry = undefined;
       if (retry && tr.docChanged) {
         const event = tr.annotation(Transaction.userEvent) || '';
-        if (!/^(input\.type|delete(?:\..*)?|undo|redo)$/.test(event) || tr.annotation(blockedInput)) {
+        if (!/^(input\.type|delete(?:\..*)?|undo|redo)$/.test(event) ||
+          tr.annotation(blockedInput) && !isUserDeletion(tr)) {
           retry = undefined;
         } else {
           retry = { ...retry, from: tr.changes.mapPos(retry.from, -1),

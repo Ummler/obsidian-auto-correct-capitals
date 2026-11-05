@@ -49,6 +49,14 @@
     const config = optionsFor(options);
     const functional = [
       { id: 'basic', title: 'Einfacher Wortabschluss', actions: [text('HAllo '), check('Hallo ')] },
+      { id: 'backspace-during-word', title: 'Tippfehler vor der ersten Autokorrektur löschen', actions: [
+        text('ABcdf'), key('Backspace'), text('ef '), check('Abcdef '),
+      ] },
+      { id: 'retry-after-backspace-edit', title: 'Erst korrigieren, dann absichtlich neu schreiben', actions: [
+        text('ABcdf'), key('Backspace'), text('ef '), check('Abcdef ', 'Erste Korrektur'),
+        key('Backspace', 7), text('ABcdef '),
+        check(settings.respectRepeatedSpelling === false ? 'Abcdef ' : 'ABcdef ', 'Bewusste Wiederholung'),
+      ] },
       { id: 'cursor-one-space', title: 'Cursor vor zweitem Wort: eine Leerstelle', actions: [
         text('Wort Wort HAllo'), key('Left', 10), text('TEst '), check('Wort Test Wort HAllo'),
       ] },
