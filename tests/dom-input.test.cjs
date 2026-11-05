@@ -5,14 +5,40 @@ const dom = new JSDOM('<body></body>', { pretendToBeVisual: true });
 for (const name of ['window', 'document', 'MutationObserver', 'HTMLElement', 'Node']) global[name] = dom.window[name];
 global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
-const { EditorState, Prec, Transaction } = require('@codemirror/state');
+const { EditorState, Prec, Transaction, StateEffect, Compartment } = require('@codemirror/state');
 const { EditorView, keymap } = require('@codemirror/view');
 const { markdown } = require('@codemirror/lang-markdown');
 const { ensureSyntaxTree } = require('@codemirror/language');
 const { history, undo } = require('@codemirror/commands');
 const { editorExtension, correctionExtension, CorrectionPolicy, DEFAULT_SETTINGS,
-  testEditorInfoField, resetTracking } = require('./helpers/runtime.cjs');
+  testEditorInfoField, resetTracking, AutoCorrectPlugin } = require('./helpers/runtime.cjs');
 const policy = new CorrectionPolicy({ ...DEFAULT_SETTINGS });
+test('plugin startup in an existing editor registers settings and command', async () => {
+  const { view, type } = make(testEditorInfoField);
+  const plugin = new AutoCorrectPlugin();
+  plugin.registerEditorExtension = extension => view.dispatch({ effects: StateEffect.appendConfig.of(extension) });
+  try {
+    type('Existing ');
+    await plugin.onload();
+    assert.ok(plugin.tab);
+    assert.equal(plugin.commands[0].id, 'toggle-auto-correction');
+    type('HAllo ');
+    assert.equal(view.state.doc.toString(), 'Existing Hallo ');
+  } finally { view.destroy(); plugin.onunload(); }
+});
+test('repeated editor extension activation and removal does not retain word ownership', () => {
+  const slot = new Compartment();
+  const { view, type } = make([testEditorInfoField, slot.of([])]);
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      view.dispatch({ effects: slot.reconfigure(editorExtension(() => policy)) });
+      type('HAllo ');
+      view.dispatch({ effects: slot.reconfigure([]) });
+      type('HAllo ');
+    }
+    assert.equal(view.state.doc.toString(), 'Hallo HAllo '.repeat(3));
+  } finally { view.destroy(); }
+});
 function make(extensions) {
   const view = new EditorView({ parent: document.body,
     state: EditorState.create({ extensions: [markdown(), history(), extensions] }) });
