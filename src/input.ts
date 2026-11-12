@@ -98,11 +98,15 @@ export function correctionExtension(getPolicy: () => CorrectionPolicy,
     },
   });
   const enabled = (state: EditorState) => {
-    const file = state.field(eligibility);
+    // When enabled in an existing editor, new fields are updated against the
+    // pre-installation state. That state has no plugin fields yet.
+    const file = state.field(eligibility, false);
+    const header = state.field(headerPolicy, false);
+    if (!file || !header) return false;
     const path = getFilePath(state), policy = getPolicy();
     const allowed = file.path === path && file.policy === policy ? file.allowed
       : path !== null && !policy.excludesPath(path);
-    return !policy.paused && allowed && !state.field(headerPolicy).disabled;
+    return !policy.paused && allowed && !header.disabled;
   };
   interface Tracking { run?: Run; retry?: Retry; policy: CorrectionPolicy }
   const tracking = StateField.define<Tracking>({
