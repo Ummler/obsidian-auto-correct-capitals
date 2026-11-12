@@ -49,6 +49,10 @@
     const config = optionsFor(options);
     const functional = [
       { id: 'basic', title: 'Einfacher Wortabschluss', actions: [text('HAllo '), check('Hallo ')] },
+      { id: 'first-correction-after-full-deletion', title: 'Ganzes Wort vor der ersten Korrektur löschen', actions: [
+        text('ABcdef'), check('ABcdef', 'Ohne Wortabschluss'), key('Backspace', 6),
+        text('ABcdef '), check('Abcdef ', 'Erste Korrektur nach Neu-Eingabe'),
+      ] },
       { id: 'backspace-during-word', title: 'Tippfehler vor der ersten Autokorrektur löschen', actions: [
         text('ABcdf'), key('Backspace'), text('ef '), check('Abcdef '),
       ] },
@@ -194,7 +198,7 @@
 
   const defaults = { characterDelayMs: 130, settleMs: 500, casePauseMs: 900, startDelayMs: 5000,
     performanceDelayMs: 40, stressSettleMs: 1500, includeFunctional: true, includeStress: true,
-    comparePaused: true, pluginDisabled: false, expectedEditorMode: null, stressParagraphs: 2000, stressBlocks: 300, longLineLength: 12000,
+    comparePaused: true, pluginDisabled: false, checkLifecycle: false, expectedEditorMode: null, stressParagraphs: 2000, stressBlocks: 300, longLineLength: 12000,
     performanceWords: 8, seed: 731 };
   function optionsFor(options = {}) {
     const merged = { ...defaults, ...options };
@@ -203,7 +207,7 @@
         throw new Error('Ungültige Zeitangabe: ' + name);
       }
     }
-    for (const name of ['includeFunctional', 'includeStress', 'comparePaused', 'pluginDisabled']) {
+    for (const name of ['includeFunctional', 'includeStress', 'comparePaused', 'pluginDisabled', 'checkLifecycle']) {
       if (typeof merged[name] !== 'boolean') throw new Error('Ungültige Option: ' + name);
     }
     if (merged.pluginDisabled) { merged.includeFunctional = false; merged.comparePaused = false; }
@@ -521,7 +525,7 @@
           performanceCases[key].push(sample);
         }
         const timings = Object.fromEntries(Object.entries(performanceCases).map(([name, samples]) => [name, summarizeMeasurements(samples)]));
-        const report = { metadata: control.metadata, notePath, counts, trustedInputEvents, droppedEvents,
+        const report = { metadata: control.metadata, lifecycle: control.lifecycle, notePath, counts, trustedInputEvents, droppedEvents,
           error: error ? String(error.message || error) : null, results, events, measurements, timings, fixtures,
           timingScope: 'sendInputEvent to first input transaction applied and next requestAnimationFrame opportunity; includes IPC, scheduling, all plugins and synchronous view work; not plugin-exclusive CPU or physical paint' };
         control.report = report;
@@ -568,10 +572,54 @@
   const control = { running: true, stopped: false, results: [],
     stop() { this.stopped = true; this.reason = 'Stop angefordert'; } };
   root.AutoCorrectLiveTest = control;
+  async function checkLifecycle(app) {
+    const id = 'auto-correct-capitals';
+    const command = id + ':toggle-auto-correction';
+    const manager = app.plugins;
+    const editor = app.workspace.activeEditor?.editor || app.workspace.activeLeaf?.view?.editor;
+    if (!editor?.cm) throw new Error('Vor dem Start eine Markdown-Notiz im Bearbeitungsmodus öffnen.');
+    if (!manager.enabledPlugins?.has(id)) throw new Error('Plugin zuerst unter Community Plugins aktivieren.');
+    const checks = control.lifecycle = [];
+    const readState = () => ({
+      loaded: !!manager.plugins[id],
+      tabs: app.setting.pluginTabs.filter(tab => tab.id === id).length,
+      command: !!app.commands.commands[command],
+    });
+    checks.push({ phase: 'initial', ...readState() });
+    for (let cycle = 1; cycle <= 3; cycle++) {
+      for (const phase of ['unload', 'load']) {
+        const result = { cycle, phase };
+        checks.push(result);
+        try {
+          if (phase === 'unload') await manager.unloadPlugin(id);
+          else await manager.loadPlugin(id);
+          Object.assign(result, readState());
+          const expected = phase === 'load';
+          if (result.loaded !== expected || result.tabs !== Number(expected) || result.command !== expected) {
+            throw new Error('Plugin, Einstellungsseite oder Pause-Befehl hat einen unerwarteten Zustand.');
+          }
+          if (expected) {
+            const tab = app.setting.pluginTabs.find(tab => tab.id === id);
+            tab.display();
+            result.settingsControls = tab.containerEl.querySelectorAll('.setting-item').length;
+            if (result.settingsControls < 5) throw new Error('Einstellungsseite enthält zu wenige Bedienelemente.');
+          }
+          result.status = 'PASS';
+        } catch (error) {
+          Object.assign(result, readState(), { status: 'FAIL', error: error.stack || String(error) });
+          throw error;
+        } finally {
+          console.log('AutoCorrect-Lifecycle', JSON.stringify(result));
+        }
+      }
+    }
+  }
   control.promise = (async () => {
     let host, error;
     try {
       const config = optionsFor(root.AutoCorrectLiveTestOptions);
+      if (config.checkLifecycle && config.pluginDisabled) throw new Error('Lifecycle und deaktivierte Baseline getrennt ausführen.');
+      if (config.checkLifecycle) await checkLifecycle(root.app);
       host = nativeHost(root.app, control, config);
       await host.prepare();
       control.results = await runSuite(host, host.settings, config, control);

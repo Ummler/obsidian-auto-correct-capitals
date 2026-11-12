@@ -22,6 +22,7 @@
       '## Gesamt', json({ counts: report.counts, trustedInputEvents: report.trustedInputEvents,
         droppedEvents: report.droppedEvents || 0, error: report.error || null }),
       '## Umgebung und Einstellungen', json(report.metadata || {}),
+      ...(report.lifecycle ? ['## Laden und Entladen', json(report.lifecycle)] : []),
       '## Fehlgeschlagene Prüfungen'];
     if (!failures.length) parts.push('Keine fehlgeschlagenen Prüfungen protokolliert.');
     for (const result of failures) {
